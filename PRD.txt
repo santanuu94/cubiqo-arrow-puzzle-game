@@ -1,0 +1,700 @@
+PRODUCT REQUIREMENTS DOCUMENT (PRD)
+
+CUBIQO: ARROW ESCAPE
+
+Complete HTML5 Browser-Based Puzzle Game
+
+Document Type: Product Requirements & Technical Development Specification
+Development Tool: Google Antigravity
+Product Category: Casual Logic Puzzle
+Target Platforms: Poki, CrazyGames, GameDistribution and other HTML5 gaming portals
+Maximum Levels: 100
+Monetization: Future rewarded video advertisements and portal SDK integrations
+Initial Release: Fully playable, monetization-ready, no active advertisements
+Primary Goal: Build an addictive, satisfying, visually attractive puzzle game that encourages repeat visits and long-term engagement.
+
+---
+
+1. PRODUCT VISION
+
+Develop an original, polished, browser-based directional arrow puzzle game called CUBIQO: ARROW ESCAPE.
+
+The fundamental gameplay involves clearing colourful directional arrows from a puzzle grid. Players must understand the direction of each arrow, identify which arrows have unobstructed exit paths, and remove them in the correct sequence. Incorrect selections produce blocked-path feedback without removing the arrow.
+
+The game should be easy to understand within seconds but progressively challenging enough to encourage logical thinking, experimentation and replayability.
+
+This must be a complete commercial-quality HTML5 game, not a demonstration, prototype, static interface or unfinished concept.
+
+Primary product objectives
+
+1. Deliver an immediately understandable and enjoyable gameplay experience.
+2. Provide exactly 100 individually designed, progressively harder and solvable levels.
+3. Create satisfying visual and audio feedback.
+4. Encourage players to return through progression, daily challenges, personal records and optional challenges.
+5. Support desktop, tablet and mobile browsers.
+6. Remain lightweight and compatible with third-party gaming portals.
+7. Prepare the monetization architecture without activating advertisements in the initial development release.
+8. Keep development architecture minimal, maintainable and efficient.
+
+2. TARGET AUDIENCE
+
+Primary audience:
+
+- Casual browser gamers.
+- Players interested in logic and brain puzzles.
+- Mobile users looking for short gaming sessions.
+- Players who enjoy completing levels and improving scores.
+- Teenagers and adults.
+
+The game should be approachable for beginners but provide enough complexity for experienced puzzle players.
+
+3. CORE GAMEPLAY CONCEPT
+
+The player receives a board containing multiple directional arrow blocks.
+
+Every arrow has:
+
+- A unique identifier.
+- A grid position.
+- A direction.
+- A visual colour.
+- An active or removed state.
+
+The player must tap or click arrows that have a completely clear path toward the corresponding edge of the board.
+
+Core rule: An arrow can leave the board only when no other active arrow occupies any cell in its directional exit path.
+
+If the path is blocked:
+
+- Do not remove the arrow.
+- Increment the move counter.
+- Display a blocked-path message.
+- Provide a subtle error animation.
+
+If the path is clear:
+
+- Animate the arrow moving outside the board.
+- Remove it from the active puzzle.
+- Increment the move counter.
+- Decrease the remaining-arrow counter.
+- Check the next available moves.
+- Check the completion condition.
+
+The level is completed when all arrows have successfully exited the board.
+
+4. VISUAL DESIGN AND UI/UX
+
+The visual experience should feel like a premium casual mobile puzzle game rather than a basic web application.
+
+Visual direction
+
+Use a colourful cubical 3D-inspired design language with attractive colour gradients, rounded geometric shapes, soft shadows and dimensional arrow tiles.
+
+Colour palette:
+
+- Purple: Primary identity.
+- Electric blue: Secondary accents.
+- Coral pink: Special highlights.
+- Mint green: Successful interactions.
+- Yellow: Hints and rewards.
+- White/off-white: Cards and gameplay surfaces.
+- Deep navy/purple: Primary text.
+
+Backgrounds
+
+Use tasteful gradients for major backgrounds, loading screens, selected buttons and special reward states. Keep them visually controlled and readable.
+
+Avoid excessive gradient effects across every individual interface element.
+
+Arrow design
+
+Each arrow should appear as a colourful cubical 3D block featuring:
+
+- A clearly visible white directional arrow.
+- A raised top surface.
+- Slightly darker side faces to establish depth.
+- Soft dimensional shadows.
+- Consistent proportions.
+- Distinct visual feedback during selection.
+
+Use lightweight CSS 3D transforms or an efficient rendering approach rather than a heavyweight 3D engine.
+
+Animation quality
+
+Prioritise:
+
+- Smooth arrow exit animations.
+- Responsive button interactions.
+- Subtle tile selection effects.
+- Gentle highlight pulses for hints.
+- Small completion particles.
+- Smooth screen transitions.
+- Clear blocked-path feedback.
+
+Animations must not delay player interaction unnecessarily.
+
+Target smooth 60 FPS on supported modern devices, with graceful performance on weaker hardware.
+
+5. APPLICATION SCREENS AND FUNCTIONAL REQUIREMENTS
+
+Screen 1: Loading Screen
+
+Display the CUBIQO logo, a short loading animation and a visually consistent background.
+
+Requirements:
+
+- Initialise game assets.
+- Load local player progression.
+- Initialise the platform adapter when available.
+- Handle SDK initialisation failures without preventing gameplay.
+- Display the home screen when ready.
+- Report loading completion through the active portal SDK when applicable.
+
+Keep loading short and avoid unnecessary introductory animations.
+
+Screen 2: Home Screen
+
+Display:
+
+- CUBIQO logo.
+- Game title and short tagline.
+- Current unlocked level.
+- Completed levels out of 100.
+- Overall progression indicator.
+- Large PLAY button.
+- LEVEL SELECT button.
+- DAILY CHALLENGE button.
+- SETTINGS button.
+- Optional daily return indicator.
+
+The PLAY button must automatically launch the highest unlocked main-game level.
+
+Provide a clear and immediate route into gameplay.
+
+Screen 3: Level Selection
+
+Display 100 numbered level tiles in a responsive grid.
+
+Tile states:
+
+- Locked.
+- Unlocked.
+- Completed.
+- Completed with one, two or three stars.
+- Currently selected.
+
+Requirements:
+
+- Players may revisit unlocked levels.
+- Locked levels cannot be selected.
+- Previously earned stars remain saved.
+- Show overall completion progress.
+- Include clear navigation back to the home screen.
+
+Screen 4: Main Gameplay
+
+This is the primary product screen and should receive the greatest development attention.
+
+Top section
+
+- Pause button.
+- Current level number.
+- Restart button.
+- Level progress indicator.
+
+Information section
+
+- Arrows remaining.
+- Moves taken.
+- Hint button.
+
+Puzzle section
+
+- Responsive square board.
+- Clearly spaced grid cells.
+- Colourful cubical directional arrows.
+- Smooth exit animations.
+- Clear empty-cell appearance.
+
+Gameplay interactions
+
+Desktop:
+
+- Mouse click to select arrows.
+- Keyboard accessibility where appropriate.
+- ESC or an equivalent supported shortcut for pausing.
+
+Mobile:
+
+- Tap to select.
+- Large touch targets.
+- No accidental browser scrolling.
+- Responsive layout for portrait and landscape where appropriate.
+
+Invalid action
+
+When an arrow is blocked:
+
+- Display "Path blocked by another arrow!"
+- Keep the arrow in its original position.
+- Increment moves.
+- Use a brief visual warning.
+- Allow another attempt immediately.
+
+Successful action
+
+When an arrow is removable:
+
+- Animate it moving in its direction.
+- Remove it from the board.
+- Update counters.
+- Recalculate available moves.
+- Check completion.
+
+Screen 5: Hint System
+
+A hint system must be available on every main-game level.
+
+When the player requests a hint:
+
+1. Calculate currently removable arrows.
+2. Identify a genuinely valid arrow.
+3. Highlight the selected arrow.
+4. Display "Tap the highlighted arrow to clear it!"
+5. Remove the highlight after successful interaction or when the player exits the hint state.
+
+Hints must never recommend an invalid move.
+
+Future monetization behaviour
+
+Prepare two configurable modes:
+
+Development mode: Hints are available without advertising.
+
+Production monetization mode: An optional rewarded advertisement can unlock a hint.
+
+The advertising button must not be activated until a compatible portal provider has been configured.
+
+The architecture must support different portal SDK implementations without changing the core puzzle logic.
+
+Important: Hints must remain optional assistance, not a mandatory requirement for completing levels. Always preserve a normal gameplay alternative. Follow each portal's rewarded-ad rules and UI requirements.
+
+Screen 6: Pause Menu
+
+Display a modal with:
+
+- Resume.
+- Restart Level.
+- Home.
+
+Requirements:
+
+- Freeze gameplay while paused.
+- Preserve the current board state.
+- Preserve move count when resuming.
+- Restart must restore the original puzzle configuration.
+- Home must preserve saved progression.
+- Notify the portal adapter of gameplay interruption where supported.
+
+Screen 7: Level Completed
+
+Display:
+
+- LEVEL COMPLETED heading.
+- Three-star rating.
+- Moves used.
+- Best moves.
+- Replay.
+- Next Level.
+- Home.
+
+Star calculation must be based on configurable per-level move targets.
+
+For example:
+
+- Three stars: Excellent performance.
+- Two stars: Good performance.
+- One star: Level completed.
+
+The player must be able to improve their previous score through replay.
+
+Save the highest star rating and best move count.
+
+Screen 8: Daily Challenge
+
+Create a separate daily puzzle experience.
+
+Requirements:
+
+- Date-based puzzle selection.
+- Deterministic puzzle generation or selection.
+- Daily completion indicator.
+- Separate daily progress.
+- A simple daily streak indicator.
+- Return-to-home navigation.
+
+Daily puzzles should not affect the main 100-level unlocking system.
+
+The initial implementation may use local browser storage for daily progress. Do not require accounts.
+
+Screen 9: Settings
+
+Include:
+
+- Sound effects toggle.
+- Haptic feedback toggle where supported.
+- Music toggle if background music is implemented.
+- Reset all progress.
+- Privacy policy link where required.
+- Back button.
+
+Reset must require confirmation.
+
+Resetting must not accidentally erase unrelated browser data.
+
+Screen 10: Final Victory
+
+After Level 100:
+
+- Display a special completion animation.
+- Show "YOU CLEARED ALL 100 LEVELS!"
+- Display total completed levels.
+- Display total moves.
+- Display total stars.
+- Provide a PLAY AGAIN option.
+- Provide a HOME option.
+
+Restarting the full campaign must require confirmation.
+
+6. LEVEL DESIGN AND DIFFICULTY PROGRESSION
+
+Create exactly 100 individually designed, validated and solvable puzzle configurations.
+
+Do not rely on random arrow placement as the primary level-generation system.
+
+Every puzzle must have a verified solution sequence.
+
+Difficulty progression
+
+Levels 1–10: Learning phase
+
+Introduce the basic directional mechanic.
+
+- Small 3×3 grids.
+- Few arrows.
+- Mostly obvious exits.
+- Simple blocking situations.
+- Gradual introduction of all four directions.
+
+Levels 11–20: Beginner challenge
+
+- More arrows.
+- More blocking relationships.
+- Multiple possible valid moves.
+- Slightly less obvious exit sequences.
+- Introduce situations where players must look ahead.
+
+Levels 21–35: Intermediate
+
+- Larger 4×4 boards where appropriate.
+- More complex arrangements.
+- Interdependent arrows.
+- Longer removal sequences.
+- More deliberate move planning.
+
+Levels 36–50: Advanced intermediate
+
+- Increased arrow density.
+- Multiple layers of blocking relationships.
+- More constrained exit sequences.
+- Several plausible but incorrect selections.
+- Larger boards.
+
+Levels 51–70: Advanced
+
+- 5×5 boards where appropriate.
+- Complex directional dependencies.
+- Long logical sequences.
+- More challenging configurations.
+- Less obvious solutions.
+
+Levels 71–90: Expert
+
+- Higher arrow density.
+- Complex interconnected paths.
+- Larger puzzle layouts.
+- More constrained solutions.
+- Stronger emphasis on planning and observation.
+
+Levels 91–100: Master challenge
+
+- The hardest configurations in the game.
+- Multiple interdependent removal decisions.
+- Longer solutions.
+- Carefully designed layouts.
+- A satisfying final challenge.
+
+Important difficulty requirement
+
+Difficulty must increase through actual logical complexity, not merely by adding more arrows.
+
+Measure difficulty using:
+
+- Minimum solution length.
+- Number of initially removable arrows.
+- Number of blocking relationships.
+- Number of plausible incorrect moves.
+- Board density.
+- Depth of removal dependencies.
+
+Avoid artificial difficulty created by unfair layouts or ambiguous controls.
+
+Level validation
+
+Implement an automated solver or backtracking validation process.
+
+Before release, verify:
+
+- Every level has at least one valid solution.
+- Every arrow has a valid eventual exit.
+- No level is accidentally impossible.
+- The solution sequence correctly clears all arrows.
+- Star targets are reasonable for the puzzle difficulty.
+
+Store levels as compact data configurations rather than creating separate screen implementations for every level.
+
+7. REPLAYABILITY AND PLAYER RETENTION
+
+The game must provide reasons for players to return beyond simply having 100 levels.
+
+Implement the following features:
+
+A. Star collection
+
+Every level offers up to three stars. Players can replay completed levels to improve their performance.
+
+B. Personal best records
+
+Save the best move count for each level and display improvements.
+
+C. Daily challenges
+
+Provide a fresh puzzle each day with a separate completion record and streak.
+
+D. Progressive difficulty
+
+Introduce new logical challenges gradually rather than making later levels repetitive.
+
+E. Milestone rewards
+
+Provide visual celebrations at meaningful milestones, such as:
+
+- Level 10.
+- Level 25.
+- Level 50.
+- Level 75.
+- Level 100.
+
+These can be cosmetic achievements without introducing a complex currency system.
+
+F. Satisfying gameplay loop
+
+Make each successful move visually and audibly rewarding. Players should feel that they are making meaningful progress.
+
+G. Optional future content
+
+Design the level system so that additional levels, challenge packs and seasonal puzzles can be added later without rewriting the game engine.
+
+Avoid manipulative streak penalties, excessive popups, artificial waiting timers or forced advertisement interruptions.
+
+8. PROGRESSION AND SAVE SYSTEM
+
+Use a simple persistence architecture.
+
+Initial release:
+
+- Browser localStorage.
+- Safe save and load operations.
+- Automatic saving.
+- Graceful handling of unavailable storage.
+- Versioned save data to support future updates.
+
+Save:
+
+- Highest unlocked level.
+- Completed levels.
+- Stars per level.
+- Best moves per level.
+- Total moves.
+- Daily challenge completion.
+- Daily streak.
+- Sound preferences.
+- Haptic preferences.
+
+The game must remain playable if localStorage is unavailable or restricted.
+
+For supported portals, prepare an optional cloud-save adapter. Local saving must remain the fallback.
+
+9. MONETIZATION ARCHITECTURE – FUTURE PHASE
+
+Monetization is deliberately excluded from the initial playable release.
+
+However, the production architecture must be ready for future integration.
+
+Supported future advertising categories
+
+1. Rewarded video advertisements for optional hints.
+2. Inter-level advertisements where the portal permits them.
+3. Portal-managed banner placements where supported.
+
+Platform adapter design
+
+Create one small advertising interface that the game can communicate with:
+
+- initialize()
+- isAvailable()
+- showRewardedHint()
+- showInterstitial()
+- pauseGame()
+- resumeGame()
+
+Each portal integration should implement this interface independently.
+
+Provider strategy
+
+Poki: Use Poki's own SDK and advertising methods. Do not integrate AdMob or another third-party advertising network into the Poki build.
+
+CrazyGames: Prepare a CrazyGames SDK adapter. Respect Basic Launch and Full Launch requirements, and do not show inactive rewarded-ad buttons when advertising is unavailable.
+
+GameDistribution: Prepare a separate GameDistribution SDK adapter following its integration and publishing requirements.
+
+Other portals: Add an adapter only after checking the platform's documentation and advertising policies.
+
+Development configuration
+
+Set:
+
+- Monetization enabled: FALSE.
+- Development hints: FREE.
+- Advertising requests: DISABLED.
+- Debug advertising interface: AVAILABLE.
+- Portal detection: PREPARED.
+
+The game must never freeze, crash or lose gameplay functionality when no advertising provider is present.
+
+Do not build a generic AdMob implementation into the shared portal build.
+
+10. TECHNICAL ARCHITECTURE
+
+Keep the implementation deliberately minimal.
+
+Use a lightweight HTML5 application with JavaScript or TypeScript, CSS and HTML.
+
+Recommended approach:
+
+- Vite for development and production builds.
+- Vanilla TypeScript or lightweight React only if it materially simplifies the application.
+- CSS 3D transforms for cubical visuals.
+- Canvas only if necessary for efficient rendering.
+- Local JSON or TypeScript data for level configurations.
+- localStorage for initial progression.
+- Small independent portal adapters.
+
+Avoid:
+
+- Unnecessary backend services.
+- Mandatory user authentication.
+- Complex databases.
+- Large 3D engines.
+- Excessive dependencies.
+- Over-engineered enterprise architecture.
+- Multiple implementations of the same gameplay logic.
+
+The game engine, level data, UI and portal integration must remain logically separated without creating an unnecessarily large project structure.
+
+11. PERFORMANCE AND BROWSER REQUIREMENTS
+
+The game must:
+
+- Work on modern desktop browsers.
+- Work on mobile Chrome, Safari and other supported browsers.
+- Support mouse, keyboard and touch input appropriately.
+- Scale to different screen sizes.
+- Prevent accidental page scrolling while interacting with the game.
+- Maintain responsive animations.
+- Load assets efficiently.
+- Bundle essential fonts and assets locally.
+- Avoid unnecessary network requests.
+- Handle lost focus, browser tab switching and interruptions.
+- Handle sound restrictions and autoplay policies gracefully.
+
+Use a landscape-friendly 16:9 game canvas where appropriate, while adapting the layout to mobile screens.
+
+Prepare portal-specific viewport and SDK configurations rather than assuming one identical integration will satisfy every publisher.
+
+12. ANALYTICS AND PRODUCT METRICS
+
+Prepare a lightweight analytics interface for future integration.
+
+Track the following events when an approved analytics provider is available:
+
+- Game loaded.
+- Gameplay started.
+- Level started.
+- Level completed.
+- Level failed or abandoned.
+- Hint requested.
+- Hint rewarded.
+- Replay started.
+- Daily challenge completed.
+- Session ended.
+
+Key product metrics to evaluate:
+
+1. Average session duration.
+2. Levels completed per session.
+3. Level completion rate.
+4. Player return rate.
+5. Daily challenge participation.
+6. Hint usage.
+7. Level-specific abandonment.
+8. Replay frequency.
+
+Do not collect unnecessary personal information. Respect portal policies and applicable privacy requirements.
+
+13. QUALITY ASSURANCE AND TESTING
+
+Before delivery, perform the following tests.
+
+Gameplay tests
+
+- All four directional arrows work.
+- Blocked arrows cannot be removed.
+- Valid arrows exit correctly.
+- Counters update accurately.
+- Rapid tapping cannot cause duplicate removals.
+- Completion triggers exactly once.
+
+Level tests
+
+- All 100 levels exist.
+- All 100 levels are solvable.
+- Difficulty progression is sensible.
+- No level contains invalid coordinates or duplicate IDs.
+- Every level has valid star targets.
+
+Progress tests
+
+- Progress saves automatically.
+- Reloading restores progress.
+- Replaying does not accidentally erase records.
+- Locked levels cannot be accessed.
+- Reset works only after confirmation.
+- Restricted localStorage does not crash the game.
+
+Interface tests
+
+- Every visible button works.
+- All screens have working navigation.
+- Modal interactions work correctly.
+- Mobile controls are comfor

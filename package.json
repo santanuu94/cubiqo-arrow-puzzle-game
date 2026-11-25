@@ -1,0 +1,31 @@
+{
+  "name": "cubiqo-arrow-escape",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CUBIQO: ARROW ESCAPE — HTML5 browser puzzle game with 100 levels, built per PRD.txt",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --host",
+    "serve": "node tools/static-server.mjs",
+    "levels": "node tools/generate-levels.mjs",
+    "validate": "node tools/validate-levels.mjs",
+    "test": "node tests/run.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "verify": "npm run validate && npm test"
+  },
+  "keywords": [
+    "html5-game",
+    "puzzle",
+    "casual",
+    "poki",
+    "crazygames",
+    "gamedistribution"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.49.1",
+    "vite": "^5.4.10"
+  }
+}

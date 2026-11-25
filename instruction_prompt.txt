@@ -1,0 +1,26 @@
+Read and follow the entire PRD provided above as the single source of truth. Your task is to build the complete, production-quality CUBIQO: Arrow Escape game—not just a prototype, mockup, or visual demo.
+
+Execution instructions:
+
+1. Use the Get Shit Done (GSD) method throughout the project. First analyse the PRD, inspect the existing project, identify all requirements, and create a clear implementation roadmap.
+2. Break the entire project into small, manageable tasks and subtasks. Execute them one by one in the correct dependency order. Do not attempt to build everything in one step.
+3. Use every relevant skill, tool, workflow, and capability available to you, including UI/UX design, frontend development, game development, animation, level design, game logic, testing, debugging, performance optimization, and browser compatibility.
+4. Before implementing each major feature, plan its tasks. After implementation, test it, fix issues, and verify that it works before moving forward.
+5. Build all 100 playable levels with progressively increasing difficulty. Ensure every level is solvable and thoroughly validate the arrow-clearing logic.
+6. Follow the PRD's visual direction and create a polished, attractive, responsive game with smooth animations, satisfying interactions, and a professional gaming experience.
+7. Implement all specified screens, features, progression systems, saving, hints, and replay mechanics. Do not leave placeholder buttons, unfinished screens, fake functionality, or incomplete features.
+8. Keep the codebase clean, modular, maintainable, and as lightweight as possible. Avoid unnecessary dependencies and backend infrastructure.
+9. Keep monetization disabled for the initial build, but implement the platform-adapter architecture described in the PRD so portal-specific SDK integration can be added later without rewriting the game.
+10. Test the complete game on desktop and mobile screen sizes. Check gameplay, level progression, save/load, restart, hints, pause/resume, completion, and edge cases.
+
+Important working rules:
+
+- Do not stop after creating the plan. Actually execute it.
+- Do not skip tasks just to finish faster.
+- Do not ask for approval after every small task; make sensible implementation decisions based on the PRD.
+- Maintain a progress checklist and mark tasks complete only after verification.
+- If something fails, investigate and fix the underlying problem rather than hiding it.
+- Do not claim a feature is complete unless it has been implemented and tested.
+- At the end, perform a complete QA pass, fix all discovered issues, and provide a summary of completed features, test results, remaining limitations, and instructions to run/build the game.
+
+Final objective: Deliver a fully playable, polished, bug-free-as-practical HTML5 browser game that is ready for evaluation and subsequent publishing to online gaming portals. Prioritize actual gameplay quality, responsiveness, performance, and player experience over merely completing the checklist.
