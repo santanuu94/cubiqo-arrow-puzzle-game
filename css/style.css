@@ -26,18 +26,18 @@ button:focus-visible {
 }
 
 :root {
-  --purple: #7c3aed;
-  --purple-dark: #5b21b6;
-  --purple-light: #a78bfa;
+  --purple: #fb2669;
+  --purple-dark: #be96fe;
+  --purple-light: #86e5fd;
   --blue: #2563eb;
   --coral: #fb7185;
   --mint: #34d399;
   --yellow: #fbbf24;
   --surface: #ffffff;
   --surface-soft: #f5f3ff;
-  --ink: #1e1b4b;
-  --ink-soft: #4c4a72;
-  --bg-gradient: linear-gradient(155deg, #2e1065 0%, #1e1b4b 55%, #172554 100%);
+  --ink: #3ef575;
+  --ink-soft: #ee1de7;
+  --bg-gradient: linear-gradient(155deg, #3310e3 0%, #60f6df 55%, #f4fa51 100%);
   --radius: 18px;
   --radius-sm: 12px;
   --font-display: ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif;
@@ -55,6 +55,7 @@ button:focus-visible {
   --ink-soft: #0e7490;
   --bg-gradient: linear-gradient(155deg, #082f49 0%, #0c4a6e 55%, #115e59 100%);
 }
+
 [data-theme="sunset"] {
   --purple: #e11d48;
   --purple-dark: #9f1239;
@@ -65,6 +66,7 @@ button:focus-visible {
   --ink-soft: #9f1239;
   --bg-gradient: linear-gradient(155deg, #4c0519 0%, #7c2d12 55%, #431407 100%);
 }
+
 [data-theme="emerald"] {
   --purple: #059669;
   --purple-dark: #065f46;
@@ -75,6 +77,7 @@ button:focus-visible {
   --ink-soft: #047857;
   --bg-gradient: linear-gradient(155deg, #022c22 0%, #064e3b 55%, #115e59 100%);
 }
+
 [data-theme="midnight"] {
   --purple: #06b6d4;
   --purple-dark: #0e7490;
@@ -86,6 +89,7 @@ button:focus-visible {
   --ink-soft: #334155;
   --bg-gradient: linear-gradient(155deg, #020617 0%, #0f172a 55%, #1e293b 100%);
 }
+
 [data-theme="royal"] {
   --purple: #d97706;
   --purple-dark: #92400e;
@@ -96,6 +100,7 @@ button:focus-visible {
   --ink-soft: #92400e;
   --bg-gradient: linear-gradient(155deg, #1c1917 0%, #451a03 55%, #2e1065 100%);
 }
+
 [data-theme="aurora"] {
   --purple: #6366f1;
   --purple-dark: #4338ca;
@@ -1362,7 +1367,11 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
-.home-sub-actions .btn { padding: 11px 10px; font-size: 13px; }
+
+.home-sub-actions .btn {
+  padding: 11px 10px;
+  font-size: 13px;
+}
 
 .scroll-body {
   flex: 1;
@@ -1385,12 +1394,14 @@ body {
   gap: 12px;
   color: rgba(255, 255, 255, 0.78);
 }
+
 .ach-card.is-unlocked {
   background: var(--surface);
   border-color: transparent;
   color: var(--ink);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
 }
+
 .ach-icon {
   width: 42px;
   height: 42px;
@@ -1402,12 +1413,28 @@ body {
   font-size: 20px;
   flex-shrink: 0;
 }
+
 .ach-card.is-unlocked .ach-icon {
   background: var(--surface-soft);
 }
-.ach-info { flex: 1; min-width: 0; }
-.ach-title { font-family: var(--font-display); font-size: 14px; font-weight: 800; }
-.ach-desc { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+
+.ach-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ach-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.ach-desc {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
 .ach-bar {
   margin-top: 6px;
   height: 5px;
@@ -1415,19 +1442,27 @@ body {
   background: rgba(255, 255, 255, 0.18);
   overflow: hidden;
 }
-.ach-card.is-unlocked .ach-bar { background: var(--surface-soft); }
+
+.ach-card.is-unlocked .ach-bar {
+  background: var(--surface-soft);
+}
+
 .ach-bar__fill {
   height: 100%;
   background: linear-gradient(90deg, var(--mint), var(--yellow));
   border-radius: 99px;
 }
+
 .ach-status {
   font-family: var(--font-display);
   font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
 }
-.ach-card.is-unlocked .ach-status { color: #059669; }
+
+.ach-card.is-unlocked .ach-status {
+  color: #059669;
+}
 
 /* ---- Themes Screen ---- */
 .theme-card {
@@ -1440,26 +1475,31 @@ body {
   gap: 12px;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
 }
+
 .theme-card.is-locked {
   background: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.82);
   box-shadow: none;
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
+
 .theme-card.is-active {
   box-shadow: 0 0 0 3px var(--yellow), 0 8px 20px rgba(0, 0, 0, 0.25);
 }
+
 .theme-swatches {
   display: flex;
   gap: 4px;
   margin-top: 6px;
 }
+
 .theme-swatch {
   width: 18px;
   height: 18px;
   border-radius: 6px;
   border: 1px solid rgba(0, 0, 0, 0.15);
 }
+
 .theme-btn {
   padding: 8px 14px;
   font-size: 12px;
@@ -1472,6 +1512,7 @@ body {
   flex-direction: column;
   gap: 6px;
 }
+
 .ach-unlock-pill {
   background: #dcfce7;
   color: #166534;
@@ -1481,6 +1522,7 @@ body {
   border-radius: 10px;
   animation: modalIn 0.28s ease-out;
 }
+
 .milestone-reward-box {
   background: var(--surface-soft);
   border: 2px solid var(--yellow);
@@ -1491,6 +1533,7 @@ body {
   gap: 8px;
   align-items: center;
 }
+
 .milestone-reward-title {
   font-family: var(--font-display);
   font-size: 13px;
