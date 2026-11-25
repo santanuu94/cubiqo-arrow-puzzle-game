@@ -10,6 +10,7 @@
   function bootstrap() {
     Cubiqo.Audio.init();
     Cubiqo.Storage.load();
+    if (Cubiqo.Themes) Cubiqo.Themes.applyActive();
     Cubiqo.UI.render();
     Cubiqo.Platform.initialize().catch(function () {});
 

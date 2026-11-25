@@ -28,7 +28,9 @@
       dailyStreak: 0,
       dailyBestStreak: 0,
       dailyCompletions: {},  /* 'YYYY-MM-DD' -> { moves, stars } */
-      achievements: {}       /* milestone id -> true */
+      achievements: {},       /* milestone/achievement id -> true */
+      activeTheme: 'classic',
+      unlockedThemes: ['classic']
     };
   }
 
@@ -54,6 +56,9 @@
     if (typeof raw.dailyBestStreak === 'number') out.dailyBestStreak = raw.dailyBestStreak;
     if (raw.dailyCompletions && typeof raw.dailyCompletions === 'object') out.dailyCompletions = raw.dailyCompletions;
     if (raw.achievements && typeof raw.achievements === 'object') out.achievements = raw.achievements;
+    if (typeof raw.activeTheme === 'string') out.activeTheme = raw.activeTheme;
+    if (Array.isArray(raw.unlockedThemes)) out.unlockedThemes = raw.unlockedThemes.slice();
+    if (out.unlockedThemes.indexOf('classic') === -1) out.unlockedThemes.unshift('classic');
     if (raw.createdAt) out.createdAt = raw.createdAt;
     return out;
   }
@@ -184,6 +189,25 @@
 
     hasAchievement: function (id) {
       return !!load().achievements[id];
+    },
+
+    getActiveTheme: function () {
+      return load().activeTheme || 'classic';
+    },
+
+    setActiveTheme: function (id) {
+      update(function (d) { d.activeTheme = id || 'classic'; });
+    },
+
+    getUnlockedThemes: function () {
+      return (load().unlockedThemes || ['classic']).slice();
+    },
+
+    unlockTheme: function (id) {
+      update(function (d) {
+        if (!Array.isArray(d.unlockedThemes)) d.unlockedThemes = ['classic'];
+        if (d.unlockedThemes.indexOf(id) === -1) d.unlockedThemes.push(id);
+      });
     }
   };
 
@@ -203,21 +227,43 @@
     },
     markComplete: function (dateKey, moves, stars) {
       var d = this.get();
-      d.completions[dateKey] = { moves: moves, stars: stars, at: new Date().toISOString() };
-      if (d.lastDate !== dateKey) {
-        var gap = d.lastDate ? Utils.daysBetween(d.lastDate, dateKey) : Infinity;
-        d.streak = gap === 1 ? d.streak + 1 : 1;
-        d.lastDate = dateKey;
-        if (d.streak > d.bestStreak) d.bestStreak = d.streak;
+      var existing = d.completions[dateKey];
+      var isFirstClaim = !existing;
+      var bestMoves = existing && existing.moves ? Math.min(existing.moves, moves) : moves;
+      var bestStars = existing && existing.stars ? Math.max(existing.stars, stars) : stars;
+      var nowIso = new Date().toISOString();
+
+      d.completions[dateKey] = {
+        moves: bestMoves,
+        stars: bestStars,
+        rewardClaimed: true,
+        claimedAt: existing && existing.claimedAt ? existing.claimedAt : nowIso,
+        at: nowIso
+      };
+
+      if (isFirstClaim) {
+        d.totalCompleted = Object.keys(d.completions).length;
+        if (d.lastDate !== dateKey) {
+          var gap = d.lastDate ? Utils.daysBetween(d.lastDate, dateKey) : Infinity;
+          if (!d.lastDate || gap >= 1) {
+            d.streak = gap === 1 ? (d.streak || 0) + 1 : 1;
+            d.lastDate = dateKey;
+            if (d.streak > (d.bestStreak || 0)) d.bestStreak = d.streak;
+          }
+        }
       }
+
       this.set(d);
       /* mirror into main save so home screen can read daily info in one place */
       update(function (save) {
-        save.dailyCompletions[dateKey] = { moves: moves, stars: stars };
+        save.dailyCompletions[dateKey] = { moves: bestMoves, stars: bestStars, rewardClaimed: true };
         save.dailyStreak = d.streak;
         save.dailyBestStreak = d.bestStreak;
         save.lastDailyDate = d.lastDate;
       });
+      d.isFirstClaim = isFirstClaim;
+      d.bestMoves = bestMoves;
+      d.bestStars = bestStars;
       return d;
     },
     todayDone: function (dateKey) {

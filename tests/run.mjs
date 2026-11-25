@@ -14,10 +14,12 @@ const Cubiqo = loadGame([
   'js/platform.js',
   'js/analytics.js',
   'js/hints.js',
-  'js/daily.js'
+  'js/daily.js',
+  'js/achievements.js',
+  'js/themes.js'
 ]);
 
-const { Config, Puzzle, Storage, DailyStore, LevelGenerator, Levels, Hints, Platform } = Cubiqo;
+const { Config, Puzzle, Storage, DailyStore, Daily, LevelGenerator, Levels, Hints, Platform, Achievements, Themes } = Cubiqo;
 
 let passed = 0;
 async function test(name, fn) {
@@ -177,6 +179,73 @@ await test('all 100 levels have 1-star, 2-star, and 3-star targets reachable und
     assert.equal(LevelGenerator.starsForMoves(k + 1, lv.stars), 2, `Level ${lv.id} 2-star`);
     assert.equal(LevelGenerator.starsForMoves(k + 2, lv.stars), 1, `Level ${lv.id} 1-star`);
   }
+});
+
+await test('daily challenge handles date changes, streaks, broken streaks & duplicate reward prevention', () => {
+  Storage.resetProgress();
+
+  // Day 1 completion -> first claim, streak = 1
+  const r1 = Daily.completeToday(14, 3, '2026-11-20');
+  assert.equal(r1.isFirstClaim, true);
+  assert.equal(r1.streak, 1);
+
+  // Same-day replay with worse moves -> duplicate reward prevented, best record preserved
+  const r1Dup = Daily.completeToday(18, 1, '2026-11-20');
+  assert.equal(r1Dup.isFirstClaim, false);
+  assert.equal(r1Dup.bestMoves, 14);
+  assert.equal(r1Dup.bestStars, 3);
+  assert.equal(r1Dup.streak, 1);
+
+  // Consecutive Day 2 -> streak = 2
+  const r2 = Daily.completeToday(15, 2, '2026-11-21');
+  assert.equal(r2.isFirstClaim, true);
+  assert.equal(r2.streak, 2);
+  assert.equal(Daily.getStatus('2026-11-21').streak, 2);
+  assert.equal(Daily.getStatus('2026-11-22').streak, 2); // still valid next day
+
+  // Skipped Day 22 -> on Day 23 effective streak resets to 0, bestStreak stays 2
+  assert.equal(Daily.getStatus('2026-11-23').streak, 0);
+  assert.equal(Daily.getStatus('2026-11-23').bestStreak, 2);
+  const r3 = Daily.completeToday(14, 3, '2026-11-23');
+  assert.equal(r3.streak, 1);
+  assert.equal(r3.bestStreak, 2);
+});
+
+await test('achievement system unlocks, persists, and avoids duplicate unlocks', () => {
+  Storage.resetProgress();
+  assert.equal(Achievements.evaluate().length, 0);
+
+  Storage.completeLevel(1, 2, 3);
+  const unlocked1 = Achievements.evaluate().map((a) => a.id);
+  assert.ok(unlocked1.includes('first-clear'));
+  assert.ok(unlocked1.includes('perfect-1'));
+
+  // Re-evaluating does not re-unlock already earned achievements
+  assert.equal(Achievements.evaluate().length, 0);
+  assert.equal(Storage.hasAchievement('first-clear'), true);
+});
+
+await test('unlockable themes enforce locks, unlock at milestones & daily streak, and equip safely', () => {
+  Storage.resetProgress();
+  assert.equal(Storage.getActiveTheme(), 'classic');
+  assert.equal(Themes.isUnlocked('classic'), true);
+  assert.equal(Themes.isUnlocked('ocean'), false);
+  assert.equal(Themes.equip('ocean'), false); // cannot equip locked theme
+
+  // Clearing Level 10 unlocks Ocean Breeze
+  Storage.completeLevel(10, 6, 3);
+  const mThemes = Themes.syncUnlocks().map((t) => t.id);
+  assert.ok(mThemes.includes('ocean'));
+  assert.equal(Themes.equip('ocean'), true);
+  assert.equal(Storage.getActiveTheme(), 'ocean');
+
+  // 3-day daily streak unlocks Daily Aurora
+  Daily.completeToday(14, 3, '2026-11-01');
+  Daily.completeToday(14, 3, '2026-11-02');
+  Daily.completeToday(14, 3, '2026-11-03');
+  const dThemes = Themes.syncUnlocks().map((t) => t.id);
+  assert.ok(dThemes.includes('aurora'));
+  assert.equal(Themes.isUnlocked('aurora'), true);
 });
 
 console.log(`\n${passed} tests passed.`);

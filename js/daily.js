@@ -19,23 +19,33 @@
     return Gen.generateDaily(dateKey || today());
   }
 
-  function getStatus() {
-    var d = today();
+  function getStatus(dateKey) {
+    var d = dateKey || today();
     var store = DailyStore.get();
     var rec = store.completions[d] || null;
+    var gap = store.lastDate ? Utils.daysBetween(store.lastDate, d) : Infinity;
+    var effectiveStreak = (gap === 0 || gap === 1) ? (store.streak || 0) : 0;
     return {
       date: d,
       completed: !!rec,
+      rewardClaimed: !!(rec && rec.rewardClaimed !== false),
       record: rec,
-      streak: store.streak || 0,
-      bestStreak: store.bestStreak || 0
+      streak: effectiveStreak,
+      bestStreak: store.bestStreak || 0,
+      totalCompleted: Object.keys(store.completions).length
     };
   }
 
-  function completeToday(moves, stars) {
-    var d = today();
+  function completeToday(moves, stars, dateKey) {
+    var d = dateKey || today();
     var res = DailyStore.markComplete(d, moves, stars);
-    Cubiqo.Analytics.track('daily_completed', { date: d, moves: moves, stars: stars, streak: res.streak });
+    Cubiqo.Analytics.track('daily_completed', {
+      date: d,
+      moves: moves,
+      stars: stars,
+      streak: res.streak,
+      firstClaim: !!res.isFirstClaim
+    });
     return res;
   }
 

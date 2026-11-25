@@ -11,5 +11,7 @@ import './platform.js';
 import './analytics.js';
 import './hints.js';
 import './daily.js';
+import './achievements.js';
+import './themes.js';
 import './ui.js';
 import './app.js';

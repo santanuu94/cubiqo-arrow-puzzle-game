@@ -13,6 +13,8 @@
   var Audio = Cubiqo.Audio;
   var Hints = Cubiqo.Hints;
   var Daily = Cubiqo.Daily;
+  var Achievements = Cubiqo.Achievements;
+  var Themes = Cubiqo.Themes;
   var Platform = Cubiqo.Platform;
   var Analytics = Cubiqo.Analytics;
 
@@ -30,6 +32,7 @@
     hintArrowId: null,
     animating: false,
     completedOnce: false,
+    lastCompleteInfo: null,
     toastTimer: null,
     runToken: 0,
     pendingTimers: []
@@ -75,6 +78,8 @@
       case 'home': renderHome(root); break;
       case 'levelSelect': renderLevelSelect(root); break;
       case 'daily': renderDailyHub(root); break;
+      case 'achievements': renderAchievements(root); break;
+      case 'themes': renderThemes(root); break;
       case 'gameplay': renderGameplay(root); break;
       case 'levelComplete': renderLevelComplete(root); break;
       case 'settings': renderSettings(root); break;
@@ -155,6 +160,10 @@
               (dailyStatus.completed ? '✓ ' : '★ ') + 'DAILY CHALLENGE' +
               (dailyStatus.streak > 0 ? '<span class="streak-chip">🔥 ' + dailyStatus.streak + '</span>' : '') +
             '</button>' +
+            '<div class="home-sub-actions">' +
+              '<button class="btn btn-secondary" id="btnHomeAchievements">🏆 ACHIEVEMENTS</button>' +
+              '<button class="btn btn-secondary" id="btnHomeThemes">🎨 THEMES</button>' +
+            '</div>' +
             '<button class="btn btn-ghost" id="btnHomeSettings">⚙ SETTINGS</button>' +
           '</div>' +
         '</div>' +
@@ -171,6 +180,14 @@
     document.getElementById('btnHomeDaily').addEventListener('click', function () {
       Audio.playClick();
       navigate('daily');
+    });
+    document.getElementById('btnHomeAchievements').addEventListener('click', function () {
+      Audio.playClick();
+      navigate('achievements');
+    });
+    document.getElementById('btnHomeThemes').addEventListener('click', function () {
+      Audio.playClick();
+      navigate('themes');
     });
     document.getElementById('btnHomeSettings').addEventListener('click', function () {
       Audio.playClick();
@@ -251,13 +268,13 @@
         '</header>' +
         '<div class="daily-body">' +
           '<div class="daily-card">' +
-            '<div class="daily-badge">' + (status.completed ? '✓ COMPLETED TODAY' : '★ TODAY\'S PUZZLE') + '</div>' +
+            '<div class="daily-badge">' + (status.completed ? '✓ COMPLETED TODAY • REWARD CLAIMED' : '★ TODAY\'S PUZZLE') + '</div>' +
             '<h3 class="daily-card__title">Fresh Daily Logic Board</h3>' +
             '<p class="daily-card__desc">Everyone gets the same deterministic puzzle today. Daily puzzles do not affect your 100-level campaign.</p>' +
             '<div class="daily-metrics">' +
               '<div class="daily-metric"><span>Current Streak</span><strong>🔥 ' + status.streak + '</strong></div>' +
               '<div class="daily-metric"><span>Best Streak</span><strong>🏆 ' + status.bestStreak + '</strong></div>' +
-              '<div class="daily-metric"><span>Today\'s Best</span><strong>' + (rec ? rec.moves + ' moves' : '—') + '</strong></div>' +
+              '<div class="daily-metric"><span>Today\'s Best</span><strong>' + (rec ? rec.moves + ' moves (' + '★'.repeat(rec.stars || 1) + ')' : '—') + '</strong></div>' +
             '</div>' +
             '<button class="btn btn-primary btn-xl" id="btnDailyPlay">' + (status.completed ? '↻ REPLAY DAILY' : '▶ PLAY DAILY PUZZLE') + '</button>' +
           '</div>' +
@@ -271,6 +288,100 @@
     document.getElementById('btnDailyPlay').addEventListener('click', function () {
       Audio.playClick();
       startDailyLevel();
+    });
+  }
+
+  /* ------------------------------------------------------------------
+     Screen 8B: Achievements
+     ------------------------------------------------------------------ */
+  function renderAchievements(root) {
+    var list = Achievements ? Achievements.list() : [];
+    var unlockedCount = list.filter(function (a) { return a.unlocked; }).length;
+    var cardsHtml = list.map(function (a) {
+      var pct = a.target ? Math.round((a.current / a.target) * 100) : 0;
+      return (
+        '<div class="ach-card' + (a.unlocked ? ' is-unlocked' : '') + '">' +
+          '<div class="ach-icon">' + a.icon + '</div>' +
+          '<div class="ach-info">' +
+            '<div class="ach-title">' + a.title + '</div>' +
+            '<div class="ach-desc">' + a.desc + '</div>' +
+            '<div class="ach-bar"><div class="ach-bar__fill" style="width:' + pct + '%"></div></div>' +
+          '</div>' +
+          '<div class="ach-status">' + (a.unlocked ? '✓ UNLOCKED' : a.current + '/' + a.target) + '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    root.innerHTML =
+      '<div class="screen screen--visible achievements-screen">' +
+        '<header class="top-bar">' +
+          '<button class="icon-btn" id="btnAchBack" aria-label="Back to home">←</button>' +
+          '<h2 class="top-bar__title">ACHIEVEMENTS</h2>' +
+          '<span class="top-bar__meta">' + unlockedCount + '/' + list.length + '</span>' +
+        '</header>' +
+        '<div class="scroll-body" id="achList">' + cardsHtml + '</div>' +
+      '</div>';
+
+    document.getElementById('btnAchBack').addEventListener('click', function () {
+      Audio.playClick();
+      navigate('home');
+    });
+  }
+
+  /* ------------------------------------------------------------------
+     Screen 8C: Unlockable Themes
+     ------------------------------------------------------------------ */
+  function renderThemes(root) {
+    if (Themes) Themes.syncUnlocks();
+    var all = Themes ? Themes.getAll() : [];
+    var unlockedCount = all.filter(function (t) { return t.unlocked; }).length;
+
+    var cardsHtml = all.map(function (t) {
+      var swHtml = t.swatches.map(function (hex) {
+        return '<span class="theme-swatch" style="background:' + hex + '"></span>';
+      }).join('');
+      var btnHtml = '';
+      if (t.active) {
+        btnHtml = '<button class="btn btn-secondary theme-btn" disabled>✓ Equipped</button>';
+      } else if (t.unlocked) {
+        btnHtml = '<button class="btn btn-primary theme-btn" data-equip-theme="' + t.id + '">Equip</button>';
+      } else {
+        btnHtml = '<button class="btn btn-ghost theme-btn" disabled>🔒 Locked</button>';
+      }
+      return (
+        '<div class="theme-card' + (t.unlocked ? '' : ' is-locked') + (t.active ? ' is-active' : '') + '">' +
+          '<div class="ach-info">' +
+            '<div class="ach-title">' + t.name + '</div>' +
+            '<div class="ach-desc">' + (t.unlocked ? t.desc : 'Unlock: ' + t.unlockText) + '</div>' +
+            '<div class="theme-swatches">' + swHtml + '</div>' +
+          '</div>' +
+          btnHtml +
+        '</div>'
+      );
+    }).join('');
+
+    root.innerHTML =
+      '<div class="screen screen--visible themes-screen">' +
+        '<header class="top-bar">' +
+          '<button class="icon-btn" id="btnThemesBack" aria-label="Back to home">←</button>' +
+          '<h2 class="top-bar__title">THEMES</h2>' +
+          '<span class="top-bar__meta">' + unlockedCount + '/' + all.length + '</span>' +
+        '</header>' +
+        '<div class="scroll-body" id="themesList">' + cardsHtml + '</div>' +
+      '</div>';
+
+    document.getElementById('btnThemesBack').addEventListener('click', function () {
+      Audio.playClick();
+      navigate('home');
+    });
+    Utils.$$('[data-equip-theme]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-equip-theme');
+        Audio.playClick();
+        if (Themes && Themes.equip(id)) {
+          renderThemes(root);
+        }
+      });
     });
   }
 
@@ -456,6 +567,8 @@
     var stars = Cubiqo.LevelGenerator.starsForMoves(state.moves, lv.stars);
     var rec = !state.isDaily ? Storage.levelRecord(state.levelId) : null;
     var milestoneTitle = !state.isDaily ? Config.MILESTONES[state.levelId] : null;
+    var info = state.lastCompleteInfo || {};
+    var dailyStatus = state.isDaily ? Daily.getStatus() : null;
 
     var starsHtml = '';
     for (var i = 1; i <= 3; i++) {
@@ -470,16 +583,55 @@
       schedule(function () { Audio.playMilestone(); }, 900);
     }
 
+    var badgeHtml = '';
+    if (milestoneTitle) {
+      badgeHtml = '<div class="milestone-pill">🏆 Milestone Unlocked: ' + milestoneTitle + ' (Level ' + state.levelId + ')</div>';
+    } else if (state.isDaily && dailyStatus) {
+      badgeHtml = '<div class="milestone-pill">' +
+        (info.isFirstClaim ? '🔥 Day ' + dailyStatus.streak + ' Streak • Daily Reward Claimed!' : '✓ Daily Replay • Reward Already Claimed Today') +
+      '</div>';
+    } else if (info.improved && !info.firstClear) {
+      badgeHtml = '<div class="milestone-pill">✨ NEW PERSONAL BEST!</div>';
+    }
+
+    var newlyUnlockedAch = info.unlockedAchievements || [];
+    var achHtml = newlyUnlockedAch.length ?
+      '<div class="ach-unlock-list">' +
+        newlyUnlockedAch.map(function (a) {
+          return '<div class="ach-unlock-pill">' + a.icon + ' Achievement Unlocked: ' + a.title + '</div>';
+        }).join('') +
+      '</div>' : '';
+
+    var rewardTheme = (!state.isDaily && Themes) ? Themes.rewardForLevel(state.levelId) : null;
+    var rewardHtml = '';
+    if (rewardTheme) {
+      var isEquipped = Storage.getActiveTheme() === rewardTheme.id;
+      var swHtml = rewardTheme.swatches.map(function (hex) {
+        return '<span class="theme-swatch" style="background:' + hex + '"></span>';
+      }).join('');
+      rewardHtml =
+        '<div class="milestone-reward-box">' +
+          '<div class="milestone-reward-title">🎨 Milestone Reward: ' + rewardTheme.name + ' Theme</div>' +
+          '<div class="theme-swatches">' + swHtml + '</div>' +
+          '<button class="btn ' + (isEquipped ? 'btn-secondary' : 'btn-primary') + ' theme-btn" id="btnEquipMilestoneTheme" ' + (isEquipped ? 'disabled' : '') + '>' +
+            (isEquipped ? '✓ Equipped' : 'Equip Theme Now') +
+          '</button>' +
+        '</div>';
+    }
+
     root.innerHTML =
       '<div class="screen screen--visible complete-screen">' +
         '<div class="particles" id="particles"></div>' +
         '<div class="complete-card">' +
-          (milestoneTitle ? '<div class="milestone-pill">🏆 Milestone Unlocked: ' + milestoneTitle + ' (Level ' + state.levelId + ')</div>' : '') +
+          badgeHtml +
           '<h2 class="complete-heading">' + (state.isDaily ? 'DAILY COMPLETED!' : 'LEVEL COMPLETED!') + '</h2>' +
           '<div class="complete-stars">' + starsHtml + '</div>' +
+          achHtml +
+          rewardHtml +
           '<div class="complete-stats">' +
             '<div class="c-stat"><span>Moves Used</span><strong>' + state.moves + '</strong></div>' +
             (rec ? '<div class="c-stat"><span>Best Moves</span><strong>' + rec.bestMoves + '</strong></div>' : '') +
+            (state.isDaily && dailyStatus && dailyStatus.record ? '<div class="c-stat"><span>Today\'s Best</span><strong>' + dailyStatus.record.moves + ' moves</strong></div>' : '') +
             '<div class="c-stat"><span>3-Star Target</span><strong>≤ ' + lv.stars.three + '</strong></div>' +
           '</div>' +
           '<div class="complete-actions">' +
@@ -492,6 +644,18 @@
       '</div>';
 
     spawnParticles();
+
+    var equipBtn = document.getElementById('btnEquipMilestoneTheme');
+    if (equipBtn && rewardTheme) {
+      equipBtn.addEventListener('click', function () {
+        Audio.playClick();
+        if (Themes && Themes.equip(rewardTheme.id)) {
+          equipBtn.textContent = '✓ Equipped';
+          equipBtn.className = 'btn btn-secondary theme-btn';
+          equipBtn.disabled = true;
+        }
+      });
+    }
 
     var nextBtn = document.getElementById('btnNextLevel');
     if (nextBtn) nextBtn.addEventListener('click', function () {
@@ -853,14 +1017,15 @@
     var lv = state.levelConfig;
     var stars = Cubiqo.LevelGenerator.starsForMoves(state.moves, lv.stars);
     if (state.isDaily) {
-      Daily.completeToday(state.moves, stars);
+      var dRes = Daily.completeToday(state.moves, stars);
+      state.lastCompleteInfo = { isFirstClaim: !!dRes.isFirstClaim, streak: dRes.streak };
     } else {
-      Storage.completeLevel(state.levelId, state.moves, stars);
-      if (Config.MILESTONES[state.levelId]) {
-        Storage.markAchievement('milestone-' + state.levelId);
-      }
+      var cRes = Storage.completeLevel(state.levelId, state.moves, stars);
+      state.lastCompleteInfo = cRes;
       Analytics.track('level_completed', { level: state.levelId, moves: state.moves, stars: stars });
     }
+    if (Themes) state.lastCompleteInfo.unlockedThemes = Themes.syncUnlocks();
+    if (Achievements) state.lastCompleteInfo.unlockedAchievements = Achievements.evaluate();
     Platform.gameplayStop();
 
     var activeToken = state.runToken;

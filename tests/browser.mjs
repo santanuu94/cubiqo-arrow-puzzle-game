@@ -84,16 +84,31 @@ try {
     }
 
     await page.waitForSelector('#btnNextLevel', { timeout: 3000 });
+    // Verify achievement unlock pill appears after completing Level 1
+    await page.waitForSelector('.ach-unlock-pill', { timeout: 2000 });
     await page.click('#btnNextLevel');
     await page.waitForSelector('#puzzleBoard');
 
-    // Test Settings & Daily Challenge navigation
+    // Test Settings, Daily Challenge, Achievements & Themes screens
     await page.click('#btnPause');
     await page.click('#btnPauseHome');
     await page.waitForSelector('#btnHomeDaily');
     await page.click('#btnHomeDaily');
     await page.waitForSelector('#btnDailyPlay');
     await page.click('#btnDailyBack');
+
+    await page.waitForSelector('#btnHomeAchievements');
+    await page.click('#btnHomeAchievements');
+    await page.waitForSelector('#achList');
+    assert.ok((await page.locator('.ach-card.is-unlocked').count()) >= 1, 'At least 1 achievement unlocked');
+    await page.click('#btnAchBack');
+
+    await page.waitForSelector('#btnHomeThemes');
+    await page.click('#btnHomeThemes');
+    await page.waitForSelector('#themesList');
+    assert.ok((await page.locator('.theme-card').count()) >= 6, 'Themes screen lists all themes');
+    await page.click('#btnThemesBack');
+
     await page.waitForSelector('#btnHomeSettings');
     await page.click('#btnHomeSettings');
     await page.waitForSelector('#btnResetProgress');
