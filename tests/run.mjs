@@ -109,6 +109,8 @@ await test('restricted localStorage falls back to in-memory storage without cras
     Storage.resetProgress();
     Storage.completeLevel(1, 3, 3);
     assert.equal(Storage.levelRecord(1).bestMoves, 3);
+    DailyStore.markComplete('2026-11-25', 14, 3);
+    assert.equal(DailyStore.todayDone('2026-11-25'), true);
   } finally {
     globalThis.localStorage = orig;
   }
@@ -166,6 +168,15 @@ await test('lifeline system gives 3 chances: wrong moves are blocked and detecte
   assert.equal(lives, 0);
   if (lives <= 0) gameOver = true;
   assert.equal(gameOver, true);
+});
+
+await test('all 100 levels have 1-star, 2-star, and 3-star targets reachable under 3-heart rule', () => {
+  for (const lv of Levels.LIST) {
+    const k = lv.arrows.length;
+    assert.equal(LevelGenerator.starsForMoves(k, lv.stars), 3, `Level ${lv.id} 3-star`);
+    assert.equal(LevelGenerator.starsForMoves(k + 1, lv.stars), 2, `Level ${lv.id} 2-star`);
+    assert.equal(LevelGenerator.starsForMoves(k + 2, lv.stars), 1, `Level ${lv.id} 1-star`);
+  }
 });
 
 console.log(`\n${passed} tests passed.`);

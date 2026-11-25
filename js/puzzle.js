@@ -228,10 +228,9 @@
 
     if (level.stars) {
       var s = level.stars;
-      if (!(s.three <= s.two)) errors.push('Star thresholds inverted');
+      if (!(s.three <= s.two && s.two <= s.one)) errors.push('Star thresholds inverted');
       var k = level.arrows ? level.arrows.length : 0;
       if (s.three < k) errors.push('Three-star target below minimum moves (' + k + ')');
-      if (s.three > s.two) errors.push('Three-star target not better than two-star');
     }
 
     return errors;

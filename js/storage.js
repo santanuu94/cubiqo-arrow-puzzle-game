@@ -11,6 +11,7 @@
   var Utils = Cubiqo.Utils;
 
   var MEMORY = null; /* fallback when localStorage is unavailable */
+  var DAILY_MEMORY = null; /* fallback for daily store when localStorage is unavailable */
 
   function defaultSave() {
     return {
@@ -169,6 +170,7 @@
     /* Reset only our own data — never touches other localStorage entries. */
     resetProgress: function () {
       MEMORY = null;
+      DAILY_MEMORY = null;
       Utils.storage.remove(Config.SAVE_KEY);
       Utils.storage.remove(Config.DAILY_KEY);
       MEMORY = defaultSave();
@@ -188,12 +190,17 @@
   /* Daily challenge progress (kept under its own key so main progress is untouched) */
   var DailyStore = {
     get: function () {
+      if (DAILY_MEMORY) return clone(DAILY_MEMORY);
       var raw = Utils.storage.get(Config.DAILY_KEY);
       if (!raw || typeof raw !== 'object') raw = { completions: {}, streak: 0, bestStreak: 0, lastDate: null };
       if (!raw.completions) raw.completions = {};
-      return raw;
+      DAILY_MEMORY = raw;
+      return clone(raw);
     },
-    set: function (v) { Utils.storage.set(Config.DAILY_KEY, v); },
+    set: function (v) {
+      DAILY_MEMORY = clone(v);
+      Utils.storage.set(Config.DAILY_KEY, v);
+    },
     markComplete: function (dateKey, moves, stars) {
       var d = this.get();
       d.completions[dateKey] = { moves: moves, stars: stars, at: new Date().toISOString() };

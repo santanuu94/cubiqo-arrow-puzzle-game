@@ -34,9 +34,34 @@ try {
     await page.click('#btnHomePlay');
     await page.waitForSelector('#puzzleBoard');
 
-    // Lifeline: verify 3 hearts are displayed and full
+    // Lifeline: verify 3 hearts are displayed and full, and HUD fits inside #app
     const hearts = await page.locator('.hud-lives .heart.is-full').count();
     assert.equal(hearts, 3, 'Game should start with 3 full hearts');
+    const hintFits = await page.evaluate(() => {
+      const app = document.getElementById('app').getBoundingClientRect();
+      const hint = document.getElementById('btnHint').getBoundingClientRect();
+      return hint.right <= app.right + 1;
+    });
+    assert.equal(hintFits, true, `Hint button should not clip on ${vp.name}`);
+
+    // Test wrong move -> heart loss -> Game Over -> Replay Level on Level 5
+    await page.evaluate(() => window.Cubiqo.UI.startMainLevel(5));
+    await page.waitForSelector('#puzzleBoard');
+    const blockedTile = page.locator('[data-arrow-id]').first();
+    await blockedTile.click();
+    assert.equal(await page.locator('.hud-lives .heart.is-full').count(), 2, '1st wrong tap loses 1 heart');
+    await blockedTile.click();
+    assert.equal(await page.locator('.hud-lives .heart.is-full').count(), 1, '2nd wrong tap loses 2nd heart');
+    await blockedTile.click();
+    assert.equal(await page.locator('.hud-lives .heart.is-full').count(), 0, '3rd wrong tap loses 3rd heart');
+    await page.waitForSelector('#gameOverModal', { state: 'visible' });
+    await page.click('#btnRetryGameOver');
+    await page.waitForSelector('#puzzleBoard');
+    assert.equal(await page.locator('.hud-lives .heart.is-full').count(), 3, 'Replay restores 3 hearts');
+
+    // Return to Level 1 to test Hint, Pause/Resume, and Completion -> Level 2
+    await page.evaluate(() => window.Cubiqo.UI.startMainLevel(1));
+    await page.waitForSelector('#puzzleBoard');
 
     // Hint highlights a valid arrow
     await page.click('#btnHint');
@@ -59,6 +84,23 @@ try {
     }
 
     await page.waitForSelector('#btnNextLevel', { timeout: 3000 });
+    await page.click('#btnNextLevel');
+    await page.waitForSelector('#puzzleBoard');
+
+    // Test Settings & Daily Challenge navigation
+    await page.click('#btnPause');
+    await page.click('#btnPauseHome');
+    await page.waitForSelector('#btnHomeDaily');
+    await page.click('#btnHomeDaily');
+    await page.waitForSelector('#btnDailyPlay');
+    await page.click('#btnDailyBack');
+    await page.waitForSelector('#btnHomeSettings');
+    await page.click('#btnHomeSettings');
+    await page.waitForSelector('#btnResetProgress');
+    await page.click('#btnResetProgress');
+    await page.waitForSelector('#confirmModal', { state: 'visible' });
+    await page.click('#modalCancel');
+
     assert.deepEqual(errors, [], `Console/page errors on ${vp.name}: ${errors.join('; ')}`);
     await context.close();
     console.log(`  ✓ ${vp.name} viewport QA passed`);

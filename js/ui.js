@@ -30,8 +30,31 @@
     hintArrowId: null,
     animating: false,
     completedOnce: false,
-    toastTimer: null
+    toastTimer: null,
+    runToken: 0,
+    pendingTimers: []
   };
+
+  function schedule(fn, delay) {
+    var id = setTimeout(function () {
+      var idx = state.pendingTimers.indexOf(id);
+      if (idx !== -1) state.pendingTimers.splice(idx, 1);
+      fn();
+    }, delay);
+    state.pendingTimers.push(id);
+    return id;
+  }
+
+  function clearPendingTimers() {
+    for (var i = 0; i < state.pendingTimers.length; i++) {
+      clearTimeout(state.pendingTimers[i]);
+    }
+    state.pendingTimers.length = 0;
+    if (state.toastTimer) {
+      clearTimeout(state.toastTimer);
+      state.toastTimer = null;
+    }
+  }
 
   function rootEl() {
     return document.getElementById('app');
@@ -60,6 +83,8 @@
   }
 
   function navigate(screen) {
+    clearPendingTimers();
+    state.runToken += 1;
     state.screen = screen;
     render();
   }
@@ -370,7 +395,7 @@
     var boardEl = document.getElementById('puzzleBoard');
     if (boardEl) {
       boardEl.addEventListener('click', function (e) {
-        if (state.paused || state.gameOver || state.animating || state.completedOnce) return;
+        if (state.paused || state.gameOver || state.completedOnce) return;
         var tile = e.target.closest('.arrow-tile');
         if (!tile) return;
         var aid = parseInt(tile.getAttribute('data-arrow-id'), 10);
@@ -437,12 +462,12 @@
       starsHtml += '<span class="complete-star ' + (i <= stars ? 'is-earned' : 'is-empty') + '" style="animation-delay:' + (i * 0.16) + 's">★</span>';
     }
 
-    setTimeout(function () { Audio.playComplete(); }, 80);
+    schedule(function () { Audio.playComplete(); }, 80);
     for (var s = 0; s < stars; s++) {
-      (function (idx) { setTimeout(function () { Audio.playStar(idx); }, 350 + idx * 200); })(s);
+      (function (idx) { schedule(function () { Audio.playStar(idx); }, 350 + idx * 200); })(s);
     }
     if (milestoneTitle) {
-      setTimeout(function () { Audio.playMilestone(); }, 900);
+      schedule(function () { Audio.playMilestone(); }, 900);
     }
 
     root.innerHTML =
@@ -633,6 +658,7 @@
   function startMainLevel(id) {
     var lv = Cubiqo.Levels.byId(id);
     if (!lv) return;
+    clearPendingTimers();
     state.isDaily = false;
     state.levelId = lv.id;
     state.levelConfig = lv;
@@ -653,6 +679,7 @@
   function startDailyLevel() {
     var lv = Daily.getPuzzleForDate();
     if (!lv) return;
+    clearPendingTimers();
     state.isDaily = true;
     state.levelId = 0;
     state.levelConfig = lv;
@@ -677,7 +704,7 @@
   }
 
   function pauseGame() {
-    if (state.screen !== 'gameplay' || state.paused || state.gameOver) return;
+    if (state.screen !== 'gameplay' || state.paused || state.gameOver || state.completedOnce) return;
     state.paused = true;
     Platform.pauseGame();
     var modal = document.getElementById('pauseModal');
@@ -686,7 +713,11 @@
       var title = state.isDaily ? 'Daily Challenge' : 'Level ' + state.levelId;
       sub.textContent = title + ' • ' + state.moves + ' moves';
     }
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+      modal.style.display = 'flex';
+      var resumeBtn = document.getElementById('btnResume');
+      if (resumeBtn) resumeBtn.focus();
+    }
   }
 
   function resumeGame() {
@@ -695,12 +726,38 @@
     Platform.resumeGame();
     var modal = document.getElementById('pauseModal');
     if (modal) modal.style.display = 'none';
+    var pauseBtn = document.getElementById('btnPause');
+    if (pauseBtn) pauseBtn.focus();
+  }
+
+  function closeActiveModal() {
+    if (state.screen === 'gameplay' && state.paused) {
+      resumeGame();
+      return true;
+    }
+    if (state.screen === 'settings') {
+      var cm = document.getElementById('confirmModal');
+      if (cm && cm.style.display === 'flex') {
+        cm.style.display = 'none';
+        return true;
+      }
+    }
+    if (state.screen === 'victory') {
+      var vm = document.getElementById('victoryResetModal');
+      if (vm && vm.style.display === 'flex') {
+        vm.style.display = 'none';
+        return true;
+      }
+    }
+    return false;
   }
 
   function handleArrowTap(arrowId) {
-    if (state.paused || state.gameOver || state.animating || state.completedOnce) return;
+    if (state.paused || state.gameOver || state.completedOnce) return;
 
     var res = Puzzle.tryRemove(state.board, arrowId);
+    if (!res.ok && res.reason !== 'blocked') return;
+
     state.moves += 1;
 
     var movesEl = document.getElementById('hudMoves');
@@ -711,7 +768,6 @@
     var tile = document.querySelector('[data-arrow-id="' + arrowId + '"]');
 
     if (!res.ok) {
-      Audio.playBlocked();
       Audio.haptic([18, 40, 18]);
 
       // Deduct a heart
@@ -732,28 +788,51 @@
       if (state.lives <= 0) {
         state.gameOver = true;
         Platform.gameplayStop();
-        Audio.playBlocked();
+        Audio.playGameOver();
+        Analytics.track('level_failed', {
+          level: state.levelId,
+          isDaily: state.isDaily,
+          moves: state.moves,
+          reason: 'out_of_hearts'
+        });
         showToast('Out of hearts! Level failed.', 'error');
         var goModal = document.getElementById('gameOverModal');
-        if (goModal) goModal.style.display = 'flex';
+        if (goModal) {
+          goModal.style.display = 'flex';
+          var retryBtn = document.getElementById('btnRetryGameOver');
+          if (retryBtn) retryBtn.focus();
+        }
         return;
       }
 
+      Audio.playBlocked();
       showToast('Blocked! Lost 1 heart (' + state.lives + ' left)', 'error');
       return;
     }
 
-    state.animating = true;
+    var token = state.runToken;
+    var boardFinished = Puzzle.isComplete(state.board);
+    if (boardFinished) state.completedOnce = true;
+
     Audio.playClear();
     Audio.haptic(10);
+
+    var remaining = Puzzle.countRemaining(state.board);
+    var arrowsEl = document.getElementById('hudArrows');
+    if (arrowsEl) arrowsEl.textContent = String(remaining);
+
+    var total = state.board.arrows.length;
+    var pct = total ? Math.round(((total - remaining) / total) * 100) : 0;
+    var fillEl = document.getElementById('levelBarFill');
+    if (fillEl) fillEl.style.width = pct + '%';
 
     if (tile) {
       tile.classList.remove('is-hint');
       tile.classList.add('exit-' + res.arrow.dir);
     }
 
-    setTimeout(function () {
-      state.animating = false;
+    schedule(function () {
+      if (token !== state.runToken) return;
       // In-place replacement: keep grid layout stable without re-rendering the whole screen
       if (tile && tile.parentNode) {
         var empty = document.createElement('div');
@@ -762,24 +841,14 @@
         tile.parentNode.replaceChild(empty, tile);
       }
 
-      var remaining = Puzzle.countRemaining(state.board);
-      var arrowsEl = document.getElementById('hudArrows');
-      if (arrowsEl) arrowsEl.textContent = String(remaining);
-
-      var total = state.board.arrows.length;
-      var pct = total ? Math.round(((total - remaining) / total) * 100) : 0;
-      var fillEl = document.getElementById('levelBarFill');
-      if (fillEl) fillEl.style.width = pct + '%';
-
-      if (Puzzle.isComplete(state.board)) {
-        finishLevel();
+      if (boardFinished) {
+        finishLevel(token);
       }
     }, Config.TIMING.exitAnimation);
   }
 
-  function finishLevel() {
-    if (state.completedOnce) return;
-    state.completedOnce = true;
+  function finishLevel(token) {
+    if (token != null && token !== state.runToken) return;
 
     var lv = state.levelConfig;
     var stars = Cubiqo.LevelGenerator.starsForMoves(state.moves, lv.stars);
@@ -787,11 +856,16 @@
       Daily.completeToday(state.moves, stars);
     } else {
       Storage.completeLevel(state.levelId, state.moves, stars);
+      if (Config.MILESTONES[state.levelId]) {
+        Storage.markAchievement('milestone-' + state.levelId);
+      }
       Analytics.track('level_completed', { level: state.levelId, moves: state.moves, stars: stars });
     }
     Platform.gameplayStop();
 
-    setTimeout(function () {
+    var activeToken = state.runToken;
+    schedule(function () {
+      if (activeToken !== state.runToken) return;
       if (!state.isDaily && state.levelId === Config.TOTAL_LEVELS) {
         navigate('victory');
       } else {
@@ -801,8 +875,10 @@
   }
 
   function triggerHint() {
-    if (state.paused || state.gameOver || state.animating) return;
+    if (state.screen !== 'gameplay' || state.paused || state.gameOver || state.completedOnce) return;
+    var token = state.runToken;
     Hints.requestHint(state.board).then(function (res) {
+      if (token !== state.runToken || state.screen !== 'gameplay' || state.paused || state.gameOver || state.completedOnce) return;
       if (res.ok && res.arrow) {
         state.hintArrowId = res.arrow.id;
         Audio.playHint();
@@ -853,6 +929,7 @@
     restartCurrent: restartCurrent,
     pauseGame: pauseGame,
     resumeGame: resumeGame,
+    closeActiveModal: closeActiveModal,
     triggerHint: triggerHint,
     getState: function () { return state; }
   };

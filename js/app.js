@@ -18,12 +18,15 @@
       var st = Cubiqo.UI.getState();
       if (e.key === 'Escape') {
         if (st.screen === 'gameplay') {
+          if (st.gameOver || st.completedOnce) return;
           if (st.paused) Cubiqo.UI.resumeGame();
           else Cubiqo.UI.pauseGame();
+        } else {
+          Cubiqo.UI.closeActiveModal();
         }
-      } else if ((e.key === 'r' || e.key === 'R') && st.screen === 'gameplay' && !st.paused) {
+      } else if ((e.key === 'r' || e.key === 'R') && st.screen === 'gameplay' && !st.paused && !st.completedOnce) {
         Cubiqo.UI.restartCurrent();
-      } else if ((e.key === 'h' || e.key === 'H') && st.screen === 'gameplay' && !st.paused) {
+      } else if ((e.key === 'h' || e.key === 'H') && st.screen === 'gameplay' && !st.paused && !st.gameOver && !st.completedOnce) {
         Cubiqo.UI.triggerHint();
       }
     });

@@ -422,15 +422,15 @@
      Star targets
      --------------------------------------------------------------------- */
 
-  /* Star thresholds are absolute move counts (the number of taps the player
-     makes, including taps that were blocked). The perfect run costs exactly
-     `arrowCount` moves, so the three-star target sits just above it and the
-     lower tiers widen out. */
-  function starTargets(arrowCount, slack) {
-    var three = arrowCount + Math.max(1, Math.round(slack.three));
-    var two = Math.max(arrowCount + Math.ceil(arrowCount * slack.two), three + 1);
-    var one = Math.max(arrowCount + Math.ceil(arrowCount * slack.one), two + 1);
-    return { three: three, two: two, one: one };
+  /* Star thresholds are aligned with the 3-heart lifeline rule:
+     0 mistakes (arrowCount moves) = 3 stars, 1 mistake = 2 stars,
+     2 mistakes = 1 star (3rd mistake triggers Game Over). */
+  function starTargets(arrowCount) {
+    return {
+      three: arrowCount,
+      two: arrowCount + 1,
+      one: arrowCount + 2
+    };
   }
 
   function starsForMoves(moves, targets) {

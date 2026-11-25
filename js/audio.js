@@ -80,6 +80,12 @@
     tone(140, 0.13, 'triangle', 0.08, 0.06);
   }
 
+  function playGameOver() {
+    tone(246.94, 0.14, 'triangle', 0.11, 0);
+    tone(196.00, 0.16, 'triangle', 0.1, 0.12);
+    tone(146.83, 0.28, 'triangle', 0.1, 0.26);
+  }
+
   function playClick() {
     tone(460, 0.045, 'sine', 0.05, 0);
   }
@@ -167,11 +173,18 @@
   function stopMusic() {
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
     if (musicGain) {
+      var g = musicGain;
+      musicGain = null;
       try {
         var c = getCtx();
-        if (c) musicGain.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.35);
+        if (c) {
+          var now = c.currentTime;
+          g.gain.cancelScheduledValues(now);
+          g.gain.setValueAtTime(Math.max(0.0001, g.gain.value || 1), now);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+          setTimeout(function () { try { g.disconnect(); } catch (e) {} }, 400);
+        }
       } catch (e) {}
-      musicGain = null;
     }
     musicActive = false;
   }
@@ -185,6 +198,7 @@
     init: init,
     playClear: playClear,
     playBlocked: playBlocked,
+    playGameOver: playGameOver,
     playClick: playClick,
     playHint: playHint,
     playStar: playStar,

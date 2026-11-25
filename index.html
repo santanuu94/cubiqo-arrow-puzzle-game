@@ -10,16 +10,18 @@
     <title>CUBIQO: Arrow Escape</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <script>
-      // Clear legacy Service Workers and caches from previous projects on localhost
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function (regs) {
-          for (var r of regs) { r.unregister(); }
-        });
-      }
-      if ('caches' in window) {
-        caches.keys().then(function (keys) {
-          for (var k of keys) { caches.delete(k); }
-        });
+      // Dev-only: clear legacy Service Workers/caches from other localhost projects
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            for (var i = 0; i < regs.length; i++) regs[i].unregister();
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then(function (keys) {
+            for (var i = 0; i < keys.length; i++) caches.delete(keys[i]);
+          });
+        }
       }
     </script>
   </head>

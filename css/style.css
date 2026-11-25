@@ -573,6 +573,11 @@ html, body {
   padding: 26px 20px;
   text-align: center;
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.35);
+  animation: modalIn 0.18s ease-out;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
 }
 .modal-card h2, .modal-card h3 { font-family: var(--font-display); margin-bottom: 6px; }
 .modal-sub { font-size: 13px; color: var(--ink-soft); margin-bottom: 18px; line-height: 1.5; }
@@ -660,4 +665,64 @@ html, body {
 }
 @keyframes pFall {
   to { transform: translateY(105vh) rotate(540deg); opacity: 0; }
+}
+
+/* ---- Responsive Polish: Narrow Mobile, Landscape & Desktop Frame ---- */
+@media (max-width: 400px) {
+  .play-screen { padding: 10px 12px; gap: 8px; }
+  .hud-row { gap: 6px; }
+  .hud-box {
+    min-width: 0;
+    flex: 1 1 0;
+    padding: 6px 4px;
+  }
+  .hud-box--lives { min-width: 0; flex: 1.3 1 0; }
+  .hud-box__val { font-size: 18px; }
+  .hud-lives { gap: 3px; }
+  .heart { font-size: 17px; }
+  .btn-hint {
+    padding: 8px 10px;
+    font-size: 13px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 520px) and (min-height: 540px) {
+  #app {
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+@media (max-height: 460px) and (min-width: 520px) {
+  #app { max-width: 760px; }
+  .play-screen {
+    display: grid;
+    grid-template-columns: 230px 1fr;
+    grid-template-rows: auto auto auto 1fr;
+    grid-template-areas:
+      "header board"
+      "bar board"
+      "hud board"
+      "toast board";
+    align-content: start;
+    gap: 8px 16px;
+    padding: 10px 16px;
+  }
+  .play-header { grid-area: header; }
+  .level-bar { grid-area: bar; }
+  .hud-row {
+    grid-area: hud;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .hud-box, .hud-box--lives { min-width: 0; padding: 6px 8px; }
+  .hud-box__val { font-size: 17px; }
+  .btn-hint { padding: 8px 10px; font-size: 13px; }
+  .toast-slot { grid-area: toast; min-height: 32px; }
+  .board-stage { grid-area: board; height: 100%; }
+  .puzzle-board { max-width: min(340px, 88vh); }
 }
