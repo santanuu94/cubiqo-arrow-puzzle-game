@@ -46,12 +46,14 @@
       inkSoft: '#4c4a72'
     },
 
-    /* Monetization — DISABLED for initial release (PRD section 9). */
+    /* Fully online architecture: internet connection required to launch & play */
+    ONLINE_REQUIRED: true,
+
+    /* Portal SDK & Monetization config (ads delivered exclusively via portal SDKs) */
     MONETIZATION: {
       enabled: false,
       hintsFree: true,
       adRequestsEnabled: false,
-      debugAdInterface: true,
       portalDetection: true
     },
 

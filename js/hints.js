@@ -51,20 +51,27 @@
    * hints are immediately granted without advertising.
    */
   function requestHint(board) {
+    if (Cubiqo.Network && !Cubiqo.Network.isOnline()) {
+      return Promise.resolve({ ok: false, reason: 'offline' });
+    }
     var arrow = pickValidHint(board);
     if (!arrow) return Promise.resolve({ ok: false, reason: 'none' });
 
-    if (!Config.MONETIZATION.enabled || Config.MONETIZATION.hintsFree || !Cubiqo.Platform.isAvailable()) {
+    if (Cubiqo.Platform.isAvailable()) {
+      Cubiqo.Analytics.track('hint_requested', { mode: 'rewarded' });
+      return Cubiqo.Platform.showRewardedHint().then(function (rewarded) {
+        if (rewarded !== true) return { ok: false, reason: 'ad-unavailable' };
+        Cubiqo.Analytics.track('hint_rewarded');
+        return { ok: true, arrow: arrow };
+      });
+    }
+
+    if (Config.MONETIZATION.hintsFree && !Config.MONETIZATION.enabled) {
       Cubiqo.Analytics.track('hint_requested', { mode: 'free' });
       return Promise.resolve({ ok: true, arrow: arrow });
     }
 
-    Cubiqo.Analytics.track('hint_requested', { mode: 'rewarded' });
-    return Cubiqo.Platform.showRewardedHint().then(function (rewarded) {
-      if (!rewarded) return { ok: false, reason: 'ad-declined' };
-      Cubiqo.Analytics.track('hint_rewarded');
-      return { ok: true, arrow: arrow };
-    });
+    return Promise.resolve({ ok: false, reason: 'ad-unavailable' });
   }
 
   Cubiqo.Hints = {

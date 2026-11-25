@@ -111,13 +111,29 @@
 
     var fill = document.getElementById('loadingFill');
     requestAnimationFrame(function () {
-      if (fill) fill.style.width = '100%';
+      if (fill) fill.style.width = '75%';
     });
-    schedule(function () {
-      Platform.gameLoadingFinished();
-      Analytics.track('game_loaded');
-      navigate('home');
-    }, 220);
+
+    var netCheck = (Config.ONLINE_REQUIRED && Cubiqo.Network)
+      ? Cubiqo.Network.check()
+      : Promise.resolve(true);
+
+    netCheck.then(function (isOnline) {
+      if (!isOnline) {
+        showOfflineGate();
+        return;
+      }
+      if (fill) fill.style.width = '100%';
+      schedule(function () {
+        if (Config.ONLINE_REQUIRED && Cubiqo.Network && !Cubiqo.Network.isOnline()) {
+          showOfflineGate();
+          return;
+        }
+        Platform.gameLoadingFinished();
+        Analytics.track('game_loaded');
+        navigate('home');
+      }, 180);
+    });
   }
 
   /* ------------------------------------------------------------------
@@ -816,6 +832,10 @@
      Gameplay Actions
      ------------------------------------------------------------------ */
   function startMainLevel(id) {
+    if (Config.ONLINE_REQUIRED && Cubiqo.Network && !Cubiqo.Network.isOnline()) {
+      showOfflineGate();
+      return;
+    }
     var lv = Cubiqo.Levels.byId(id) || Cubiqo.Levels.byId(1);
     if (!lv) {
       showToast('Unable to load puzzle. Please reload.', 'error');
@@ -840,6 +860,10 @@
   }
 
   function startDailyLevel() {
+    if (Config.ONLINE_REQUIRED && Cubiqo.Network && !Cubiqo.Network.isOnline()) {
+      showOfflineGate();
+      return;
+    }
     var lv = Daily.getPuzzleForDate();
     if (!lv) return;
     clearPendingTimers();
@@ -916,6 +940,10 @@
   }
 
   function handleArrowTap(arrowId) {
+    if (Config.ONLINE_REQUIRED && Cubiqo.Network && !Cubiqo.Network.isOnline()) {
+      showOfflineGate();
+      return;
+    }
     if (state.paused || state.gameOver || state.completedOnce) return;
 
     var res = Puzzle.tryRemove(state.board, arrowId);
@@ -1052,6 +1080,10 @@
         var target = document.querySelector('[data-arrow-id="' + res.arrow.id + '"]');
         if (target) target.classList.add('is-hint');
         showToast('Tap the highlighted arrow to clear it!', 'hint');
+      } else if (res.reason === 'offline') {
+        showOfflineGate();
+      } else if (res.reason === 'ad-unavailable') {
+        showToast('Rewarded hint unavailable right now. Try again shortly.', 'error');
       } else {
         showToast('No removable arrows available.', 'error');
       }
@@ -1089,6 +1121,61 @@
     }, 2800);
   }
 
+  function showOfflineGate() {
+    var root = rootEl();
+    if (!root) return;
+    var gate = document.getElementById('offlineGate');
+    if (gate) {
+      gate.style.display = 'flex';
+      return;
+    }
+    gate = document.createElement('div');
+    gate.className = 'modal-backdrop offline-gate';
+    gate.id = 'offlineGate';
+    gate.setAttribute('role', 'alertdialog');
+    gate.setAttribute('aria-modal', 'true');
+    gate.innerHTML =
+      '<div class="modal-card">' +
+        '<div class="offline-icon">🌐</div>' +
+        '<h2>INTERNET CONNECTION REQUIRED</h2>' +
+        '<p class="modal-sub">CUBIQO: Arrow Escape is an online game. Connect to the internet to launch and play. Your saved progress is safe.</p>' +
+        '<p class="modal-sub" id="offlineStatus" style="margin-bottom:14px;font-weight:700"></p>' +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-primary btn-xl" id="btnRetryConnection">↻ Retry Connection</button>' +
+        '</div>' +
+      '</div>';
+    root.appendChild(gate);
+
+    var retryBtn = document.getElementById('btnRetryConnection');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', function () {
+        var statusEl = document.getElementById('offlineStatus');
+        retryBtn.disabled = true;
+        retryBtn.textContent = 'Checking...';
+        if (statusEl) statusEl.textContent = '';
+        (Cubiqo.Network ? Cubiqo.Network.check() : Promise.resolve(false)).then(function (ok) {
+          retryBtn.disabled = false;
+          retryBtn.textContent = '↻ Retry Connection';
+          if (ok) {
+            hideOfflineGate();
+          } else if (statusEl) {
+            statusEl.textContent = 'Still offline. Please check your connection.';
+          }
+        });
+      });
+    }
+  }
+
+  function hideOfflineGate() {
+    var gate = document.getElementById('offlineGate');
+    if (gate && gate.parentNode) gate.parentNode.removeChild(gate);
+    if (state.screen === 'loading') {
+      Platform.gameLoadingFinished();
+      Analytics.track('game_loaded');
+      navigate('home');
+    }
+  }
+
   Cubiqo.UI = {
     render: render,
     navigate: navigate,
@@ -1099,6 +1186,8 @@
     resumeGame: resumeGame,
     closeActiveModal: closeActiveModal,
     triggerHint: triggerHint,
+    showOfflineGate: showOfflineGate,
+    hideOfflineGate: hideOfflineGate,
     getState: function () { return state; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

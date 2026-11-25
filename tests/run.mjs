@@ -9,7 +9,12 @@ import { loadGame, CORE_FILES, installLocalStorageStub } from '../tools/_load.mj
 installLocalStorageStub();
 
 const Cubiqo = loadGame([
-  ...CORE_FILES,
+  'js/config.js',
+  'js/utils.js',
+  'js/network.js',
+  'js/storage.js',
+  'js/puzzle.js',
+  'js/level-generator.js',
   'js/levels.js',
   'js/platform.js',
   'js/analytics.js',
@@ -19,7 +24,7 @@ const Cubiqo = loadGame([
   'js/themes.js'
 ]);
 
-const { Config, Puzzle, Storage, DailyStore, Daily, LevelGenerator, Levels, Hints, Platform, Achievements, Themes } = Cubiqo;
+const { Config, Network, Puzzle, Storage, DailyStore, Daily, LevelGenerator, Levels, Hints, Platform, Achievements, Themes } = Cubiqo;
 
 let passed = 0;
 async function test(name, fn) {
@@ -135,7 +140,7 @@ await test('platform adapter has monetization disabled in initial build', async 
   assert.equal(Config.MONETIZATION.hintsFree, true);
   await Platform.initialize('dev');
   assert.equal(Platform.isAvailable(), false);
-  assert.equal(await Platform.showRewardedHint(), true);
+  assert.equal(await Platform.showRewardedHint(), false);
 });
 
 await test('lifeline system gives 3 chances: wrong moves are blocked and detected', () => {
@@ -280,6 +285,69 @@ await test('platform adapter exposes cloud-save hooks without requiring backend'
   assert.equal(typeof Platform.loadCloud, 'function');
   assert.equal(await Platform.saveCloud(Storage.exportSave()), false);
   assert.equal(await Platform.loadCloud(), null);
+});
+
+await test('online network check blocks offline state and restores on reconnect', async () => {
+  const events = [];
+  Network.subscribe((s) => events.push(s));
+
+  Network.setProbe(() => false);
+  assert.equal(await Network.check(), false);
+  assert.equal(Network.isOnline(), false);
+
+  const lv = Levels.byId(1);
+  const board = Puzzle.createBoard(lv);
+  const offlineHint = await Hints.requestHint(board);
+  assert.equal(offlineHint.ok, false);
+  assert.equal(offlineHint.reason, 'offline');
+
+  Network.setProbe(() => true);
+  assert.equal(await Network.check(), true);
+  assert.equal(Network.isOnline(), true);
+  assert.deepEqual(events.slice(-2), [false, true]);
+  Network.setProbe(null);
+});
+
+await test('portal SDK failures are handled gracefully and never fake rewarded ads', async () => {
+  const prevEnabled = Config.MONETIZATION.enabled;
+  const prevAdReq = Config.MONETIZATION.adRequestsEnabled;
+  const prevPoki = globalThis.PokiSDK;
+
+  try {
+    // 1. SDK init failure does not crash and marks status failed
+    globalThis.PokiSDK = { init: () => Promise.reject(new Error('SDK down')) };
+    const initOk = await Platform.initialize('poki');
+    assert.equal(initOk, false);
+    assert.equal(Platform.getStatus().status, 'failed');
+    assert.equal(Platform.isAvailable(), false);
+
+    // 2. Active portal SDK: ad declined/failed NEVER grants rewarded benefit
+    Config.MONETIZATION.enabled = true;
+    Config.MONETIZATION.adRequestsEnabled = true;
+    globalThis.PokiSDK = {
+      init: () => Promise.resolve(),
+      rewardedBreak: () => Promise.resolve(false)
+    };
+    assert.equal(await Platform.initialize('poki'), true);
+    assert.equal(Platform.isAvailable(), true);
+
+    const board = Puzzle.createBoard(Levels.byId(1));
+    const denied = await Hints.requestHint(board);
+    assert.equal(denied.ok, false);
+    assert.equal(denied.reason, 'ad-unavailable');
+
+    // 3. Only confirmed rewardedBreak === true grants the hint
+    globalThis.PokiSDK.rewardedBreak = () => Promise.resolve(true);
+    const granted = await Hints.requestHint(board);
+    assert.equal(granted.ok, true);
+    assert.ok(granted.arrow);
+  } finally {
+    Config.MONETIZATION.enabled = prevEnabled;
+    Config.MONETIZATION.adRequestsEnabled = prevAdReq;
+    if (prevPoki === undefined) delete globalThis.PokiSDK;
+    else globalThis.PokiSDK = prevPoki;
+    await Platform.initialize('dev');
+  }
 });
 
 console.log(`\n${passed} tests passed.`);

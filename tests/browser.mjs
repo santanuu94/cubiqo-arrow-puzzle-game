@@ -124,6 +124,14 @@ try {
     await page.waitForSelector('#confirmModal', { state: 'visible' });
     await page.click('#modalCancel');
 
+    // Test offline blocking, manual retry while offline, & auto-reconnection recovery
+    await context.setOffline(true);
+    await page.waitForSelector('#offlineGate', { state: 'visible', timeout: 3000 });
+    await page.click('#btnRetryConnection');
+    await page.waitForFunction(() => (document.getElementById('offlineStatus')?.textContent || '').includes('Still offline'));
+    await context.setOffline(false);
+    await page.waitForSelector('#offlineGate', { state: 'detached', timeout: 3000 });
+
     assert.deepEqual(errors, [], `Console/page errors on ${vp.name}: ${errors.join('; ')}`);
     await context.close();
     console.log(`  ✓ ${vp.name} viewport QA passed`);

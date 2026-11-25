@@ -10,12 +10,16 @@
   var Cubiqo = global.Cubiqo = global.Cubiqo || {};
   var MONETIZATION = Cubiqo.Config.MONETIZATION;
 
-  function DevAdapter() { this.name = 'dev'; }
+  function onlineOk() {
+    return !Cubiqo.Network || Cubiqo.Network.isOnline();
+  }
+
+  function DevAdapter() { this.name = 'dev'; this.ready = true; }
   DevAdapter.prototype = {
-    initialize: function () { return Promise.resolve(true); },
+    initialize: function () { this.ready = true; return Promise.resolve(true); },
     isAvailable: function () { return false; },
-    showRewardedHint: function () { return Promise.resolve(true); },
-    showInterstitial: function () { return Promise.resolve(); },
+    showRewardedHint: function () { return Promise.resolve(false); },
+    showInterstitial: function () { return Promise.resolve(false); },
     pauseGame: function () {},
     resumeGame: function () {},
     gameLoadingFinished: function () {},
@@ -25,21 +29,28 @@
     loadCloud: function () { return Promise.resolve(null); }
   };
 
-  function PokiAdapter() { this.name = 'poki'; this.sdk = null; }
+  function PokiAdapter() { this.name = 'poki'; this.sdk = null; this.ready = false; }
   PokiAdapter.prototype = {
     initialize: function () {
+      var self = this;
       this.sdk = global.PokiSDK || null;
-      if (!this.sdk || !this.sdk.init) return Promise.resolve(false);
-      return this.sdk.init().then(function () { return true; }).catch(function () { return false; });
+      if (!this.sdk || !this.sdk.init) { self.ready = false; return Promise.resolve(false); }
+      return this.sdk.init().then(function () {
+        self.ready = true;
+        return true;
+      }).catch(function () {
+        self.ready = false;
+        return false;
+      });
     },
-    isAvailable: function () { return MONETIZATION.enabled && !!this.sdk; },
+    isAvailable: function () { return MONETIZATION.enabled && MONETIZATION.adRequestsEnabled && this.ready && !!this.sdk && onlineOk(); },
     showRewardedHint: function () {
-      if (!this.isAvailable() || !this.sdk.rewardedBreak) return Promise.resolve(true);
-      return this.sdk.rewardedBreak().then(function (ok) { return !!ok; }).catch(function () { return false; });
+      if (!this.isAvailable() || !this.sdk.rewardedBreak) return Promise.resolve(false);
+      return this.sdk.rewardedBreak().then(function (ok) { return ok === true; }).catch(function () { return false; });
     },
     showInterstitial: function () {
-      if (!this.isAvailable() || !this.sdk.commercialBreak) return Promise.resolve();
-      return this.sdk.commercialBreak().catch(function () {});
+      if (!this.isAvailable() || !this.sdk.commercialBreak) return Promise.resolve(false);
+      return this.sdk.commercialBreak().then(function () { return true; }).catch(function () { return false; });
     },
     pauseGame: function () { if (this.sdk && this.sdk.gameplayStop) this.sdk.gameplayStop(); },
     resumeGame: function () { if (this.sdk && this.sdk.gameplayStart) this.sdk.gameplayStart(); },
@@ -50,32 +61,43 @@
     loadCloud: function () { return Promise.resolve(null); }
   };
 
-  function CrazyGamesAdapter() { this.name = 'crazygames'; this.sdk = null; }
+  function CrazyGamesAdapter() { this.name = 'crazygames'; this.sdk = null; this.ready = false; }
   CrazyGamesAdapter.prototype = {
     initialize: function () {
+      var self = this;
       this.sdk = (global.CrazyGames && global.CrazyGames.SDK) || null;
-      if (!this.sdk || !this.sdk.init) return Promise.resolve(false);
-      return this.sdk.init().then(function () { return true; }).catch(function () { return false; });
+      if (!this.sdk || !this.sdk.init) { self.ready = false; return Promise.resolve(false); }
+      return this.sdk.init().then(function () {
+        self.ready = true;
+        return true;
+      }).catch(function () {
+        self.ready = false;
+        return false;
+      });
     },
-    isAvailable: function () { return MONETIZATION.enabled && !!this.sdk; },
+    isAvailable: function () { return MONETIZATION.enabled && MONETIZATION.adRequestsEnabled && this.ready && !!this.sdk && onlineOk(); },
     showRewardedHint: function () {
       var sdk = this.sdk;
-      if (!this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) return Promise.resolve(true);
+      if (!this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) return Promise.resolve(false);
       return new Promise(function (resolve) {
-        sdk.ad.requestAd('rewarded', {
-          adFinished: function () { resolve(true); },
-          adError: function () { resolve(false); }
-        });
+        try {
+          sdk.ad.requestAd('rewarded', {
+            adFinished: function () { resolve(true); },
+            adError: function () { resolve(false); }
+          });
+        } catch (e) { resolve(false); }
       });
     },
     showInterstitial: function () {
       var sdk = this.sdk;
-      if (!this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) return Promise.resolve();
+      if (!this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) return Promise.resolve(false);
       return new Promise(function (resolve) {
-        sdk.ad.requestAd('midgame', {
-          adFinished: function () { resolve(); },
-          adError: function () { resolve(); }
-        });
+        try {
+          sdk.ad.requestAd('midgame', {
+            adFinished: function () { resolve(true); },
+            adError: function () { resolve(false); }
+          });
+        } catch (e) { resolve(false); }
       });
     },
     pauseGame: function () { if (this.sdk && this.sdk.gameplay && this.sdk.gameplay.stop) this.sdk.gameplay.stop(); },
@@ -87,20 +109,25 @@
     loadCloud: function () { return Promise.resolve(null); }
   };
 
-  function GameDistributionAdapter() { this.name = 'gamedistribution'; this.sdk = null; }
+  function GameDistributionAdapter() { this.name = 'gamedistribution'; this.sdk = null; this.ready = false; }
   GameDistributionAdapter.prototype = {
     initialize: function () {
       this.sdk = global.gdsdk || null;
-      return Promise.resolve(!!this.sdk);
+      this.ready = !!this.sdk;
+      return Promise.resolve(this.ready);
     },
-    isAvailable: function () { return MONETIZATION.enabled && !!this.sdk; },
+    isAvailable: function () { return MONETIZATION.enabled && MONETIZATION.adRequestsEnabled && this.ready && !!this.sdk && onlineOk(); },
     showRewardedHint: function () {
-      if (!this.isAvailable() || !this.sdk.showAd) return Promise.resolve(true);
-      return this.sdk.showAd('rewarded').then(function () { return true; }).catch(function () { return false; });
+      if (!this.isAvailable() || !this.sdk.showAd) return Promise.resolve(false);
+      return Promise.resolve(this.sdk.showAd('rewarded'))
+        .then(function (res) { return res !== false; })
+        .catch(function () { return false; });
     },
     showInterstitial: function () {
-      if (!this.isAvailable() || !this.sdk.showAd) return Promise.resolve();
-      return this.sdk.showAd().catch(function () {});
+      if (!this.isAvailable() || !this.sdk.showAd) return Promise.resolve(false);
+      return Promise.resolve(this.sdk.showAd())
+        .then(function () { return true; })
+        .catch(function () { return false; });
     },
     pauseGame: function () {},
     resumeGame: function () {},
@@ -129,13 +156,19 @@
   }
 
   var active = new DevAdapter();
+  var sdkStatus = 'uninitialized';
 
   Cubiqo.Platform = {
     detectPortal: detectPortal,
     createAdapter: createAdapter,
+    getStatus: function () { return { portal: active.name, status: sdkStatus, available: active.isAvailable() }; },
     initialize: function (portal) {
       active = createAdapter(portal);
-      return active.initialize().catch(function () {
+      return active.initialize().then(function (ok) {
+        sdkStatus = ok ? 'ready' : 'failed';
+        return !!ok;
+      }).catch(function () {
+        sdkStatus = 'failed';
         active = new DevAdapter();
         return false;
       });

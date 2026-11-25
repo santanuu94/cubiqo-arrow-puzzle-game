@@ -1547,3 +1547,14 @@ body {
   font-weight: 800;
   color: var(--ink);
 }
+
+/* ---- Online Connectivity Gate ---- */
+.offline-gate {
+  z-index: 90;
+  background: rgba(15, 23, 42, 0.88);
+}
+
+.offline-icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+}

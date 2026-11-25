@@ -27,8 +27,29 @@
       Cubiqo.Audio.init();
       Cubiqo.Storage.load();
       if (Cubiqo.Themes) Cubiqo.Themes.applyActive();
+      if (Cubiqo.Network) {
+        Cubiqo.Network.init(function (isOnline) {
+          var st = Cubiqo.UI.getState();
+          if (!isOnline) {
+            Cubiqo.Audio.stopMusic();
+            if (st.screen === 'gameplay' && !st.paused && !st.gameOver) {
+              Cubiqo.UI.pauseGame();
+            }
+            Cubiqo.UI.showOfflineGate();
+          } else {
+            Cubiqo.UI.hideOfflineGate();
+            var pStat = Cubiqo.Platform.getStatus ? Cubiqo.Platform.getStatus() : null;
+            if (!pStat || pStat.status === 'uninitialized' || pStat.status === 'failed') {
+              Cubiqo.Platform.initialize().catch(function () {});
+            }
+            Cubiqo.Audio.syncMusic();
+          }
+        });
+      }
       Cubiqo.UI.render();
-      Cubiqo.Platform.initialize().catch(function () {});
+      if (!Cubiqo.Network || Cubiqo.Network.isOnline()) {
+        Cubiqo.Platform.initialize().catch(function () {});
+      }
     } catch (err) {
       showFatalRecovery();
       return;

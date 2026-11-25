@@ -2,6 +2,7 @@
 import '../css/style.css';
 import './config.js';
 import './utils.js';
+import './network.js';
 import './storage.js';
 import './puzzle.js';
 import './level-generator.js';
