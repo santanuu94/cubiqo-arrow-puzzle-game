@@ -110,19 +110,14 @@
       '</div>';
 
     var fill = document.getElementById('loadingFill');
-    var pct = 0;
-    var timer = setInterval(function () {
-      pct = Math.min(100, pct + 18 + Math.random() * 14);
-      if (fill) fill.style.width = pct + '%';
-      if (pct >= 100) {
-        clearInterval(timer);
-        setTimeout(function () {
-          Platform.gameLoadingFinished();
-          Analytics.track('game_loaded');
-          navigate('home');
-        }, 180);
-      }
-    }, 60);
+    requestAnimationFrame(function () {
+      if (fill) fill.style.width = '100%';
+    });
+    schedule(function () {
+      Platform.gameLoadingFinished();
+      Analytics.track('game_loaded');
+      navigate('home');
+    }, 220);
   }
 
   /* ------------------------------------------------------------------
@@ -694,6 +689,7 @@
           '<label class="setting-row"><span>🔊 Sound Effects</span><input type="checkbox" class="switch" id="setSound" ' + (settings.sound ? 'checked' : '') + '></label>' +
           '<label class="setting-row"><span>🎵 Ambient Music</span><input type="checkbox" class="switch" id="setMusic" ' + (settings.music ? 'checked' : '') + '></label>' +
           '<label class="setting-row"><span>📳 Haptic Feedback</span><input type="checkbox" class="switch" id="setHaptics" ' + (settings.haptics ? 'checked' : '') + '></label>' +
+          (!Storage.available() || !Storage.isPersistent() ? '<p class="modal-sub" style="color:#fde68a;margin:4px 0 0">Session-only mode: browser storage is restricted.</p>' : '') +
           '<div class="settings-sep"></div>' +
           '<button class="btn btn-secondary" id="btnPrivacy">ℹ Privacy Policy</button>' +
           '<button class="btn btn-danger" id="btnResetProgress">⚠ Reset All Progress</button>' +
@@ -820,8 +816,11 @@
      Gameplay Actions
      ------------------------------------------------------------------ */
   function startMainLevel(id) {
-    var lv = Cubiqo.Levels.byId(id);
-    if (!lv) return;
+    var lv = Cubiqo.Levels.byId(id) || Cubiqo.Levels.byId(1);
+    if (!lv) {
+      showToast('Unable to load puzzle. Please reload.', 'error');
+      return;
+    }
     clearPendingTimers();
     state.isDaily = false;
     state.levelId = lv.id;
@@ -1084,6 +1083,10 @@
       p.style.animationDuration = (1.3 + Math.random() * 1.4) + 's';
       box.appendChild(p);
     }
+    schedule(function () {
+      var el = document.getElementById('particles');
+      if (el) el.innerHTML = '';
+    }, 2800);
   }
 
   Cubiqo.UI = {

@@ -248,4 +248,38 @@ await test('unlockable themes enforce locks, unlock at milestones & daily streak
   assert.equal(Themes.isUnlocked('aurora'), true);
 });
 
+await test('corrupted save data, invalid JSON, and out-of-range fields recover gracefully', () => {
+  Storage.resetProgress();
+  const corruptedMain = {
+    highestUnlocked: 9999,
+    levels: { '1': { stars: 3, bestMoves: 2 }, bad: 'corrupt', '999': { stars: 99 } },
+    totalStars: 999,
+    dailyStreak: -5,
+    activeTheme: 'nonexistent-theme',
+    unlockedThemes: [123, null]
+  };
+  const imported = Storage.importSave({
+    main: corruptedMain,
+    daily: { completions: { '2026-11-25': { moves: 14, stars: 3 } }, bestStreak: 4 }
+  });
+  assert.equal(imported, true);
+  const loaded = Storage.load();
+  assert.equal(loaded.highestUnlocked, 100); // clamped to TOTAL_LEVELS
+  assert.equal(loaded.totalStars, 3); // recomputed from valid level 1 only
+  assert.equal(loaded.activeTheme, 'classic'); // fallback when invalid
+  assert.ok(loaded.unlockedThemes.includes('classic'));
+  assert.equal(DailyStore.get().bestStreak, 4);
+
+  // Invalid JSON in localStorage never crashes Utils.storage.get
+  localStorage.setItem(Config.SAVE_KEY, '{not-valid-json');
+  assert.equal(Cubiqo.Utils.storage.get(Config.SAVE_KEY), null);
+});
+
+await test('platform adapter exposes cloud-save hooks without requiring backend', async () => {
+  assert.equal(typeof Platform.saveCloud, 'function');
+  assert.equal(typeof Platform.loadCloud, 'function');
+  assert.equal(await Platform.saveCloud(Storage.exportSave()), false);
+  assert.equal(await Platform.loadCloud(), null);
+});
+
 console.log(`\n${passed} tests passed.`);

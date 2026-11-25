@@ -7,12 +7,38 @@
 
   var Cubiqo = global.Cubiqo = global.Cubiqo || {};
 
+  function showFatalRecovery() {
+    var root = document.getElementById('app');
+    if (!root || root.querySelector('.error-recovery-card')) return;
+    root.innerHTML =
+      '<div class="screen screen--visible complete-screen">' +
+        '<div class="complete-card error-recovery-card">' +
+          '<h2>Something went wrong</h2>' +
+          '<p class="modal-sub">We hit an unexpected hiccup. Your saved progress is safe.</p>' +
+          '<button class="btn btn-primary btn-xl" id="btnRecoverReload">↻ Reload Game</button>' +
+        '</div>' +
+      '</div>';
+    var btn = document.getElementById('btnRecoverReload');
+    if (btn) btn.addEventListener('click', function () { location.reload(); });
+  }
+
   function bootstrap() {
-    Cubiqo.Audio.init();
-    Cubiqo.Storage.load();
-    if (Cubiqo.Themes) Cubiqo.Themes.applyActive();
-    Cubiqo.UI.render();
-    Cubiqo.Platform.initialize().catch(function () {});
+    try {
+      Cubiqo.Audio.init();
+      Cubiqo.Storage.load();
+      if (Cubiqo.Themes) Cubiqo.Themes.applyActive();
+      Cubiqo.UI.render();
+      Cubiqo.Platform.initialize().catch(function () {});
+    } catch (err) {
+      showFatalRecovery();
+      return;
+    }
+
+    global.addEventListener('error', function () {
+      if (!document.getElementById('app') || !document.getElementById('app').children.length) {
+        showFatalRecovery();
+      }
+    });
 
     /* Keyboard shortcuts (PRD §5 Screen 4) */
     document.addEventListener('keydown', function (e) {

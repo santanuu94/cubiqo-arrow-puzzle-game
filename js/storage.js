@@ -12,6 +12,15 @@
 
   var MEMORY = null; /* fallback when localStorage is unavailable */
   var DAILY_MEMORY = null; /* fallback for daily store when localStorage is unavailable */
+  var PERSISTENT = true;
+
+  function isPlainObject(v) {
+    return !!v && typeof v === 'object' && !Array.isArray(v);
+  }
+
+  function nonNegInt(v, fallback) {
+    return (typeof v === 'number' && isFinite(v) && v >= 0) ? Math.floor(v) : (fallback || 0);
+  }
 
   function defaultSave() {
     return {
@@ -36,30 +45,82 @@
 
   function migrate(raw) {
     var out = defaultSave();
-    if (!raw || typeof raw !== 'object') return out;
-    /* Future migrations hook in here. v1 is the first version. */
-    if (raw.levels && typeof raw.levels === 'object') out.levels = raw.levels;
-    if (typeof raw.highestUnlocked === 'number') out.highestUnlocked = raw.highestUnlocked;
-    if (typeof raw.totalMoves === 'number') out.totalMoves = raw.totalMoves;
-    if (typeof raw.totalStars === 'number') out.totalStars = raw.totalStars;
-    if (raw.settings && typeof raw.settings === 'object') {
+    if (!isPlainObject(raw)) return out;
+
+    /* Sanitize level records and recompute totalStars safely */
+    var maxCleared = 0;
+    var starSum = 0;
+    if (isPlainObject(raw.levels)) {
+      var lKeys = Object.keys(raw.levels);
+      for (var i = 0; i < lKeys.length; i++) {
+        var idNum = parseInt(lKeys[i], 10);
+        if (!Number.isInteger(idNum) || idNum < 1 || idNum > Config.TOTAL_LEVELS) continue;
+        var rec = raw.levels[lKeys[i]];
+        if (!isPlainObject(rec)) continue;
+        var stars = nonNegInt(rec.stars, 0);
+        var bestMoves = nonNegInt(rec.bestMoves, 0);
+        if (stars < 1 || stars > 3 || bestMoves < 1) continue;
+        out.levels[idNum] = {
+          stars: stars,
+          bestMoves: bestMoves,
+          completedAt: typeof rec.completedAt === 'string' ? rec.completedAt : null
+        };
+        starSum += stars;
+        if (idNum > maxCleared) maxCleared = idNum;
+      }
+    }
+
+    var rawUnlocked = nonNegInt(raw.highestUnlocked, 1);
+    var minUnlocked = maxCleared > 0 ? Math.min(Config.TOTAL_LEVELS, maxCleared + 1) : 1;
+    out.highestUnlocked = Math.max(1, Math.min(Config.TOTAL_LEVELS, Math.max(rawUnlocked, minUnlocked)));
+    out.totalMoves = nonNegInt(raw.totalMoves, 0);
+    out.totalStars = starSum;
+
+    if (isPlainObject(raw.settings)) {
       out.settings.sound = raw.settings.sound !== false;
       out.settings.haptics = raw.settings.haptics !== false;
       out.settings.music = raw.settings.music === true;
     }
-    if (raw.stats && typeof raw.stats === 'object') {
-      out.stats.gamesPlayed = raw.stats.gamesPlayed || 0;
-      out.stats.lastPlayed = raw.stats.lastPlayed || null;
+    if (isPlainObject(raw.stats)) {
+      out.stats.gamesPlayed = nonNegInt(raw.stats.gamesPlayed, 0);
+      out.stats.lastPlayed = typeof raw.stats.lastPlayed === 'string' ? raw.stats.lastPlayed : null;
     }
-    if (typeof raw.lastDailyDate === 'string') out.lastDailyDate = raw.lastDailyDate;
-    if (typeof raw.dailyStreak === 'number') out.dailyStreak = raw.dailyStreak;
-    if (typeof raw.dailyBestStreak === 'number') out.dailyBestStreak = raw.dailyBestStreak;
-    if (raw.dailyCompletions && typeof raw.dailyCompletions === 'object') out.dailyCompletions = raw.dailyCompletions;
-    if (raw.achievements && typeof raw.achievements === 'object') out.achievements = raw.achievements;
-    if (typeof raw.activeTheme === 'string') out.activeTheme = raw.activeTheme;
-    if (Array.isArray(raw.unlockedThemes)) out.unlockedThemes = raw.unlockedThemes.slice();
+    if (typeof raw.lastDailyDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.lastDailyDate)) {
+      out.lastDailyDate = raw.lastDailyDate;
+    }
+    out.dailyStreak = nonNegInt(raw.dailyStreak, 0);
+    out.dailyBestStreak = Math.max(out.dailyStreak, nonNegInt(raw.dailyBestStreak, 0));
+
+    if (isPlainObject(raw.dailyCompletions)) {
+      var dKeys = Object.keys(raw.dailyCompletions);
+      for (var d = 0; d < dKeys.length; d++) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dKeys[d])) continue;
+        var dRec = raw.dailyCompletions[dKeys[d]];
+        if (!isPlainObject(dRec)) continue;
+        out.dailyCompletions[dKeys[d]] = {
+          moves: Math.max(1, nonNegInt(dRec.moves, 1)),
+          stars: Math.max(1, Math.min(3, nonNegInt(dRec.stars, 1))),
+          rewardClaimed: dRec.rewardClaimed !== false
+        };
+      }
+    }
+
+    if (isPlainObject(raw.achievements)) {
+      var aKeys = Object.keys(raw.achievements);
+      for (var a = 0; a < aKeys.length; a++) {
+        if (raw.achievements[aKeys[a]] === true) out.achievements[aKeys[a]] = true;
+      }
+    }
+
+    if (Array.isArray(raw.unlockedThemes)) {
+      out.unlockedThemes = raw.unlockedThemes.filter(function (t) { return typeof t === 'string' && t.length > 0; });
+    }
     if (out.unlockedThemes.indexOf('classic') === -1) out.unlockedThemes.unshift('classic');
-    if (raw.createdAt) out.createdAt = raw.createdAt;
+
+    if (typeof raw.activeTheme === 'string' && out.unlockedThemes.indexOf(raw.activeTheme) !== -1) {
+      out.activeTheme = raw.activeTheme;
+    }
+    if (typeof raw.createdAt === 'string') out.createdAt = raw.createdAt;
     return out;
   }
 
@@ -68,13 +129,14 @@
     var raw = Utils.storage.get(Config.SAVE_KEY);
     var data = migrate(raw);
     MEMORY = data;
+    PERSISTENT = Utils.storage.available();
     return clone(data);
   }
 
   function save(data) {
     MEMORY = data;
     data.updatedAt = new Date().toISOString();
-    Utils.storage.set(Config.SAVE_KEY, data);
+    PERSISTENT = Utils.storage.set(Config.SAVE_KEY, data);
     return data;
   }
 
@@ -93,7 +155,53 @@
     save: save,
     update: update,
     available: function () { return Utils.storage.available(); },
+    isPersistent: function () { return PERSISTENT; },
     inMemory: function () { return MEMORY !== null; },
+
+    exportSave: function () {
+      return { version: Config.SAVE_VERSION, main: load(), daily: DailyStore.get() };
+    },
+
+    importSave: function (payload) {
+      if (!isPlainObject(payload)) return false;
+      var incoming = migrate(payload.main || payload);
+      update(function (cur) {
+        cur.highestUnlocked = Math.max(cur.highestUnlocked, incoming.highestUnlocked);
+        cur.totalMoves = Math.max(cur.totalMoves, incoming.totalMoves);
+        var lKeys = Object.keys(incoming.levels);
+        for (var i = 0; i < lKeys.length; i++) {
+          var id = lKeys[i], incRec = incoming.levels[id], curRec = cur.levels[id];
+          if (!curRec) {
+            cur.levels[id] = clone(incRec);
+          } else {
+            curRec.stars = Math.max(curRec.stars, incRec.stars);
+            curRec.bestMoves = Math.min(curRec.bestMoves, incRec.bestMoves);
+          }
+        }
+        var sum = 0, allKeys = Object.keys(cur.levels);
+        for (var j = 0; j < allKeys.length; j++) sum += cur.levels[allKeys[j]].stars || 0;
+        cur.totalStars = sum;
+
+        var aKeys = Object.keys(incoming.achievements);
+        for (var a = 0; a < aKeys.length; a++) cur.achievements[aKeys[a]] = true;
+
+        for (var t = 0; t < incoming.unlockedThemes.length; t++) {
+          if (cur.unlockedThemes.indexOf(incoming.unlockedThemes[t]) === -1) {
+            cur.unlockedThemes.push(incoming.unlockedThemes[t]);
+          }
+        }
+      });
+      if (isPlainObject(payload.daily) && isPlainObject(payload.daily.completions)) {
+        var dCur = DailyStore.get();
+        var dKeys = Object.keys(payload.daily.completions);
+        for (var k = 0; k < dKeys.length; k++) {
+          if (!dCur.completions[dKeys[k]]) dCur.completions[dKeys[k]] = payload.daily.completions[dKeys[k]];
+        }
+        dCur.bestStreak = Math.max(dCur.bestStreak || 0, nonNegInt(payload.daily.bestStreak, 0));
+        DailyStore.set(dCur);
+      }
+      return true;
+    },
 
     levelRecord: function (levelId) {
       var d = load();
@@ -211,15 +319,39 @@
     }
   };
 
+  function sanitizeDaily(raw) {
+    var out = { completions: {}, streak: 0, bestStreak: 0, lastDate: null };
+    if (!isPlainObject(raw)) return out;
+    if (isPlainObject(raw.completions)) {
+      var keys = Object.keys(raw.completions);
+      for (var i = 0; i < keys.length; i++) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(keys[i])) continue;
+        var r = raw.completions[keys[i]];
+        if (!isPlainObject(r)) continue;
+        out.completions[keys[i]] = {
+          moves: Math.max(1, nonNegInt(r.moves, 1)),
+          stars: Math.max(1, Math.min(3, nonNegInt(r.stars, 1))),
+          rewardClaimed: r.rewardClaimed !== false,
+          claimedAt: typeof r.claimedAt === 'string' ? r.claimedAt : null,
+          at: typeof r.at === 'string' ? r.at : null
+        };
+      }
+    }
+    out.streak = nonNegInt(raw.streak, 0);
+    out.bestStreak = Math.max(out.streak, nonNegInt(raw.bestStreak, 0));
+    if (typeof raw.lastDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.lastDate)) {
+      out.lastDate = raw.lastDate;
+    }
+    return out;
+  }
+
   /* Daily challenge progress (kept under its own key so main progress is untouched) */
   var DailyStore = {
     get: function () {
       if (DAILY_MEMORY) return clone(DAILY_MEMORY);
       var raw = Utils.storage.get(Config.DAILY_KEY);
-      if (!raw || typeof raw !== 'object') raw = { completions: {}, streak: 0, bestStreak: 0, lastDate: null };
-      if (!raw.completions) raw.completions = {};
-      DAILY_MEMORY = raw;
-      return clone(raw);
+      DAILY_MEMORY = sanitizeDaily(raw);
+      return clone(DAILY_MEMORY);
     },
     set: function (v) {
       DAILY_MEMORY = clone(v);

@@ -89,10 +89,18 @@ try {
     await page.click('#btnNextLevel');
     await page.waitForSelector('#puzzleBoard');
 
-    // Test Settings, Daily Challenge, Achievements & Themes screens
-    await page.click('#btnPause');
-    await page.click('#btnPauseHome');
-    await page.waitForSelector('#btnHomeDaily');
+    // Test dynamic viewport resize during gameplay
+    await page.setViewportSize({ width: 667, height: 375 });
+    await page.waitForTimeout(100);
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+
+    // Multi-session reload persistence check: reload and verify Lv 2 + 3 stars persist
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('#btnHomePlay', { timeout: 5000 });
+    const playText = await page.locator('#btnHomePlay').textContent();
+    assert.ok(playText && playText.includes('2'), `Expected Level 2 unlocked after reload, got: ${playText}`);
+
+    // Test Settings, Daily Challenge, Achievements & Themes screens from Home
     await page.click('#btnHomeDaily');
     await page.waitForSelector('#btnDailyPlay');
     await page.click('#btnDailyBack');

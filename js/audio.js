@@ -147,6 +147,11 @@
       osc.connect(f);
       f.connect(g);
       g.connect(musicGain);
+      (function (o, filt, gainNode) {
+        o.onended = function () {
+          try { o.disconnect(); filt.disconnect(); gainNode.disconnect(); } catch (e) {}
+        };
+      })(osc, f, g);
       osc.start(now);
       osc.stop(now + 3.6);
     }

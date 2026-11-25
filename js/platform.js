@@ -148,6 +148,8 @@
     resumeGame: function () { active.resumeGame(); },
     gameLoadingFinished: function () { active.gameLoadingFinished(); },
     gameplayStart: function () { active.gameplayStart(); },
-    gameplayStop: function () { active.gameplayStop(); }
+    gameplayStop: function () { active.gameplayStop(); },
+    saveCloud: function (data) { return active.saveCloud(data); },
+    loadCloud: function () { return active.loadCloud(); }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

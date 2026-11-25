@@ -137,13 +137,21 @@
     });
   }
 
+  var cachedList = null;
+
   Cubiqo.Levels = {
     TOTAL: DATA.length,
     RAW: DATA,
-    LIST: expand(DATA),
     byId: function (id) {
       for (var i = 0; i < DATA.length; i++) if (DATA[i].id === id) return expand([DATA[i]])[0];
       return null;
     }
   };
+  Object.defineProperty(Cubiqo.Levels, 'LIST', {
+    enumerable: true,
+    get: function () {
+      if (!cachedList) cachedList = expand(DATA);
+      return cachedList;
+    }
+  });
 })(typeof window !== 'undefined' ? window : globalThis);
