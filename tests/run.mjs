@@ -136,12 +136,13 @@ await test('daily challenge is deterministic and isolated from main campaign', (
   assert.equal(Storage.load().highestUnlocked, 1);
 });
 
-await test('platform adapter keeps hints free and DevAdapter unavailable in Stage 2', async () => {
+await test('platform adapter keeps hints free and DevAdapter unavailable in Stage 3', async () => {
   assert.equal(Config.MONETIZATION.midgameAdsEnabled, true);
-  assert.equal(Config.MONETIZATION.rewardedAdsEnabled, false);
+  assert.equal(Config.MONETIZATION.rewardedAdsEnabled, true);
   assert.equal(Config.MONETIZATION.hintsFree, true);
   await Platform.initialize('dev');
   assert.equal(Platform.isAvailable(), false);
+  assert.equal(Platform.isRewardedAvailable(), false);
   assert.equal(await Platform.showRewardedHint(), false);
 });
 
@@ -336,13 +337,13 @@ await test('portal SDK failures are handled gracefully and never fake rewarded a
     assert.equal(Platform.isAvailable(), true);
 
     const board = Puzzle.createBoard(Levels.byId(1));
-    const denied = await Hints.requestHint(board);
+    const denied = await Hints.requestHint(board, { useAd: true });
     assert.equal(denied.ok, false);
     assert.equal(denied.reason, 'ad-unavailable');
 
     // 3. Only confirmed rewardedBreak === true grants the hint
     globalThis.PokiSDK.rewardedBreak = () => Promise.resolve(true);
-    const granted = await Hints.requestHint(board);
+    const granted = await Hints.requestHint(board, { useAd: true });
     assert.equal(granted.ok, true);
     assert.ok(granted.arrow);
   } finally {
@@ -472,11 +473,109 @@ await test('CrazyGames Stage 2 midgame ads handle adStarted/adFinished/adError, 
     assert.equal(await p3, false);
     assert.equal(Cubiqo.Audio.isAdMuted(), false);
 
-    // 3. Hints remain free in Stage 2 (no rewarded ads requested)
+    // 3. Normal free hints remain available without ads
     const hintRes = await Hints.requestHint(Puzzle.createBoard(Levels.byId(1)));
     assert.equal(hintRes.ok, true);
     assert.equal(adRequests, 2);
   } finally {
+    Cubiqo.Audio.setAdMute(false);
+    Cubiqo.Audio.setPlatformMute(false);
+    if (prevCG === undefined) delete globalThis.CrazyGames;
+    else globalThis.CrazyGames = prevCG;
+    await Platform.initialize('dev');
+  }
+});
+
+await test('CrazyGames Stage 3 rewarded ads enforce lifecycle, cooldown, single-reward & coin economy', async () => {
+  const prevCG = globalThis.CrazyGames;
+  try {
+    Storage.resetProgress();
+
+    // 1. Coin economy: first clear + 3-star bonus + milestone bonus, no duplicate claims, no negative balance
+    assert.equal(Storage.getCoins(), 0);
+    const c1 = Storage.completeLevel(1, 2, 3);
+    assert.equal(c1.coinsEarned, 15);
+    assert.equal(Storage.getCoins(), 15);
+    const c1Dup = Storage.completeLevel(1, 2, 3);
+    assert.equal(c1Dup.coinsEarned, 0);
+    assert.equal(Storage.getCoins(), 15);
+
+    const c10 = Storage.completeLevel(10, 6, 3);
+    assert.equal(c10.coinsEarned, 65); // 10 + 5 + 50 milestone
+    assert.equal(Storage.getCoins(), 80);
+
+    assert.equal(Storage.spendCoins(30), true);
+    assert.equal(Storage.getCoins(), 50);
+    assert.equal(Storage.spendCoins(999), false); // cannot go negative
+    assert.equal(Storage.getCoins(), 50);
+
+    // 2. CrazyGames rewarded ad lifecycle + double-callback + cooldown + adError
+    let reqCount = 0;
+    let lastCb = null;
+    globalThis.CrazyGames = {
+      SDK: {
+        environment: 'crazygames',
+        init: async () => {},
+        game: { settings: { muteAudio: false } },
+        ad: {
+          requestAd: (type, cb) => {
+            assert.equal(type, 'rewarded');
+            reqCount++;
+            lastCb = cb;
+          }
+        }
+      }
+    };
+
+    assert.equal(await Platform.initialize('crazygames'), true);
+    assert.equal(Platform.isRewardedAvailable(), true);
+    assert.equal(Platform.getRewardedCooldownRemaining(), 0);
+
+    // adError grants no reward and restores audio
+    const pErr = Platform.showRewardedAd();
+    assert.equal(reqCount, 1);
+    lastCb.adStarted();
+    assert.equal(Cubiqo.Audio.isAdMuted(), true);
+    lastCb.adError({ code: 'adblock' });
+    assert.equal(await pErr, false);
+    assert.equal(Cubiqo.Audio.isAdMuted(), false);
+    assert.equal(Platform.getRewardedCooldownRemaining(), 0); // failed ad does not lock cooldown
+
+    // adFinished grants once, deduplicates concurrent calls, and activates cooldown
+    const pA = Platform.showRewardedAd();
+    const pB = Platform.showRewardedAd();
+    assert.equal(reqCount, 2);
+    lastCb.adStarted();
+    assert.equal(Cubiqo.Audio.isAdMuted(), true);
+    lastCb.adFinished();
+    lastCb.adFinished(); // duplicate callback ignored
+    assert.equal(await pA, true);
+    assert.equal(await pB, true);
+    assert.equal(Cubiqo.Audio.isAdMuted(), false);
+    assert.ok(Platform.getRewardedCooldownRemaining() > 0);
+
+    // During cooldown, new rewarded ad request is blocked
+    assert.equal(await Platform.showRewardedAd(), false);
+    assert.equal(reqCount, 2);
+
+    // Reset cooldown -> rewarded hint only granted after adFinished
+    Storage.setLastRewardedAdAt(0);
+    const pHint = Hints.requestHint(Puzzle.createBoard(Levels.byId(1)), { useAd: true });
+    assert.equal(reqCount, 3);
+    lastCb.adStarted();
+    lastCb.adFinished();
+    const hintRes = await pHint;
+    assert.equal(hintRes.ok, true);
+    assert.ok(hintRes.arrow);
+
+    // 3. Basic Launch / missing ad object -> isRewardedAvailable() is false
+    globalThis.CrazyGames = {
+      SDK: { environment: 'crazygames', init: async () => {}, game: {} }
+    };
+    await Platform.initialize('crazygames');
+    assert.equal(Platform.isRewardedAvailable(), false);
+  } finally {
+    Storage.resetProgress();
     Cubiqo.Audio.setAdMute(false);
     Cubiqo.Audio.setPlatformMute(false);
     if (prevCG === undefined) delete globalThis.CrazyGames;

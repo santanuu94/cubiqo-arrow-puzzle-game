@@ -39,7 +39,11 @@
       dailyCompletions: {},  /* 'YYYY-MM-DD' -> { moves, stars } */
       achievements: {},       /* milestone/achievement id -> true */
       activeTheme: 'classic',
-      unlockedThemes: ['classic']
+      unlockedThemes: ['classic'],
+      coins: 0,
+      hintBank: 0,
+      rewardedMilestones: {},
+      lastRewardedAdAt: 0
     };
   }
 
@@ -119,6 +123,15 @@
 
     if (typeof raw.activeTheme === 'string' && out.unlockedThemes.indexOf(raw.activeTheme) !== -1) {
       out.activeTheme = raw.activeTheme;
+    }
+    out.coins = nonNegInt(raw.coins, 0);
+    out.hintBank = nonNegInt(raw.hintBank, 0);
+    out.lastRewardedAdAt = nonNegInt(raw.lastRewardedAdAt, 0);
+    if (isPlainObject(raw.rewardedMilestones)) {
+      var mKeys = Object.keys(raw.rewardedMilestones);
+      for (var m = 0; m < mKeys.length; m++) {
+        if (raw.rewardedMilestones[mKeys[m]] === true) out.rewardedMilestones[mKeys[m]] = true;
+      }
     }
     if (typeof raw.createdAt === 'string') out.createdAt = raw.createdAt;
     return out;
@@ -214,7 +227,7 @@
 
     /* Record a completion. Returns info about the result. */
     completeLevel: function (levelId, moves, stars) {
-      var result = { newStars: 0, improved: false, prevBest: null, unlockedNext: false, firstClear: false };
+      var result = { newStars: 0, improved: false, prevBest: null, unlockedNext: false, firstClear: false, coinsEarned: 0 };
       var data = update(function (d) {
         var rec = d.levels[levelId];
         if (!rec) {
@@ -223,12 +236,31 @@
         }
         result.firstClear = rec.completedAt === null;
         result.prevBest = rec.bestMoves || null;
+        var prevStars = rec.stars || 0;
         if (!rec.bestMoves || moves < rec.bestMoves) {
           rec.bestMoves = moves;
           result.improved = true;
         }
         if (stars > rec.stars) rec.stars = stars;
         rec.completedAt = new Date().toISOString();
+
+        /* Award gameplay coins once per first clear / 3-star upgrade / milestone (no duplicate claims) */
+        var econ = Config.ECONOMY || {};
+        var earned = 0;
+        if (result.firstClear) {
+          earned += econ.levelClearCoins || 10;
+          if (stars === 3) earned += econ.threeStarBonusCoins || 5;
+        } else if (prevStars < 3 && stars === 3) {
+          earned += econ.threeStarBonusCoins || 5;
+        }
+        if (Config.MILESTONES[levelId] && !d.rewardedMilestones[levelId]) {
+          d.rewardedMilestones[levelId] = true;
+          earned += econ.milestoneBonusCoins || 50;
+        }
+        if (earned > 0) {
+          d.coins = (d.coins || 0) + earned;
+          result.coinsEarned = earned;
+        }
 
         d.totalMoves += moves;
         d.stats.gamesPlayed += 1;
@@ -316,6 +348,52 @@
         if (!Array.isArray(d.unlockedThemes)) d.unlockedThemes = ['classic'];
         if (d.unlockedThemes.indexOf(id) === -1) d.unlockedThemes.push(id);
       });
+    },
+
+    getCoins: function () { return load().coins || 0; },
+
+    addCoins: function (amount) {
+      var n = nonNegInt(amount, 0);
+      if (n <= 0) return load().coins || 0;
+      return update(function (d) { d.coins = (d.coins || 0) + n; }).coins;
+    },
+
+    spendCoins: function (amount) {
+      var cost = nonNegInt(amount, 0);
+      if (cost <= 0) return false;
+      var ok = false;
+      update(function (d) {
+        if ((d.coins || 0) >= cost) {
+          d.coins -= cost;
+          ok = true;
+        }
+      });
+      return ok;
+    },
+
+    getHintBank: function () { return load().hintBank || 0; },
+
+    addHints: function (n) {
+      var count = nonNegInt(n, 0);
+      if (count <= 0) return load().hintBank || 0;
+      return update(function (d) { d.hintBank = (d.hintBank || 0) + count; }).hintBank;
+    },
+
+    consumeHint: function () {
+      var ok = false;
+      update(function (d) {
+        if ((d.hintBank || 0) > 0) {
+          d.hintBank -= 1;
+          ok = true;
+        }
+      });
+      return ok;
+    },
+
+    getLastRewardedAdAt: function () { return load().lastRewardedAdAt || 0; },
+
+    setLastRewardedAdAt: function (ts) {
+      update(function (d) { d.lastRewardedAdAt = nonNegInt(ts, 0); });
     }
   };
 
@@ -392,6 +470,9 @@
         save.dailyStreak = d.streak;
         save.dailyBestStreak = d.bestStreak;
         save.lastDailyDate = d.lastDate;
+        if (isFirstClaim) {
+          save.coins = (save.coins || 0) + ((Config.ECONOMY && Config.ECONOMY.dailyClearCoins) || 25);
+        }
       });
       d.isFirstClaim = isFirstClaim;
       d.bestMoves = bestMoves;

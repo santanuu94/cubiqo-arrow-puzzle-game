@@ -693,6 +693,16 @@ body {
   animation: heartShake 0.4s ease;
 }
 
+.heart.is-restored {
+  animation: heartRestore 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes heartRestore {
+  0% { transform: scale(0.4); opacity: 0.4; }
+  60% { transform: scale(1.45); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 @keyframes heartShake {
 
   0%,
@@ -1556,5 +1566,45 @@ body {
 
 .offline-icon {
   font-size: 48px;
+  margin-bottom: 10px;
+}
+
+/* ---- Stage 3 Rewarded & Coin Recovery UI ---- */
+.gameover-recover-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.gameover-recover-row .btn {
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  font-size: 13px;
+}
+.gameover-recover-row .btn small {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.88;
+}
+.gameover-recover-row .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-ad {
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+.btn-coins {
+  background: linear-gradient(135deg, #fef08a, var(--yellow));
+  color: #78350f;
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+}
+.reward-note {
+  font-size: 11px;
+  color: var(--ink-soft);
+  min-height: 16px;
   margin-bottom: 10px;
 }

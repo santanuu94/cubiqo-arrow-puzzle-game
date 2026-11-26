@@ -63,24 +63,32 @@ try {
     await page.evaluate(() => window.Cubiqo.UI.startMainLevel(1));
     await page.waitForSelector('#puzzleBoard');
 
-    // Hint highlights a valid arrow
+    // Hint highlights a valid arrow (1st free hint) and 2nd hint opens outside-gameplay Hint modal
     await page.click('#btnHint');
     await page.waitForSelector('.arrow-tile.is-hint');
+    await page.click('#btnHint');
+    await page.waitForSelector('#hintModal', { state: 'visible' });
+    await page.click('#btnHintCancel');
+    await page.waitForSelector('#hintModal', { state: 'hidden' });
 
     // Pause and resume preserves state
     await page.click('#btnPause');
     await page.waitForSelector('#pauseModal');
     await page.click('#btnResume');
 
-    // Clear all hinted/clear arrows to complete level 1
+    // Clear all arrows using free/hinted moves (reset level 1 so free hint is fresh)
+    await page.evaluate(() => window.Cubiqo.UI.startMainLevel(1));
+    await page.waitForSelector('#puzzleBoard');
     while (true) {
       await page.waitForFunction(() => document.querySelectorAll('[class*="exit-"]').length === 0);
       const remaining = await page.locator('.arrow-tile').count();
       if (remaining === 0) break;
-      await page.click('#btnHint');
-      const target = page.locator('.arrow-tile.is-hint').first();
-      await target.waitFor({ state: 'visible' });
-      await target.click();
+      await page.evaluate(async () => {
+        const res = await window.Cubiqo.Hints.requestHint(window.Cubiqo.UI.getState().board);
+        if (res.ok && res.arrow) {
+          document.querySelector('[data-arrow-id="' + res.arrow.id + '"]')?.click();
+        }
+      });
     }
 
     await page.waitForSelector('#btnNextLevel', { timeout: 3000 });

@@ -46,6 +46,7 @@
       });
     },
     isAvailable: function () { return MONETIZATION.enabled && MONETIZATION.adRequestsEnabled && this.ready && !!this.sdk && onlineOk(); },
+    isRewardedAvailable: function () { return MONETIZATION.rewardedAdsEnabled && this.isAvailable() && !!this.sdk && !!this.sdk.rewardedBreak; },
     showRewardedHint: function () {
       if (!this.isAvailable() || !this.sdk.rewardedBreak) return Promise.resolve(false);
       return this.sdk.rewardedBreak().then(function (ok) { return ok === true; }).catch(function () { return false; });
@@ -120,20 +121,61 @@
       return MONETIZATION.enabled && MONETIZATION.adRequestsEnabled && this.ready &&
         this.environment !== 'disabled' && !!this.sdk && onlineOk();
     },
-    showRewardedHint: function () {
+    isRewardedAvailable: function () {
+      return MONETIZATION.rewardedAdsEnabled && this.isAvailable() && !!this.sdk && !!this.sdk.ad && typeof this.sdk.ad.requestAd === 'function';
+    },
+    getRewardedCooldownRemaining: function () {
+      var last = Cubiqo.Storage && Cubiqo.Storage.getLastRewardedAdAt ? Cubiqo.Storage.getLastRewardedAdAt() : 0;
+      if (!last) return 0;
+      var cd = MONETIZATION.rewardedCooldownMs || 90000;
+      var rem = last + cd - Date.now();
+      return rem > 0 ? Math.ceil(rem / 1000) : 0;
+    },
+    showRewardedAd: function () {
+      var self = this;
       var sdk = this.sdk;
-      if (!MONETIZATION.rewardedAdsEnabled || !this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) {
+      if (!this.isRewardedAvailable() || this.getRewardedCooldownRemaining() > 0) {
         return Promise.resolve(false);
       }
-      this.gameplayStop();
-      return new Promise(function (resolve) {
+      if (this._adPending) return this._adPending;
+
+      this._adPending = new Promise(function (resolve) {
+        var settled = false;
+        function done(ok) {
+          if (settled) return;
+          settled = true;
+          self._adPending = null;
+          if (ok && Cubiqo.Storage && Cubiqo.Storage.setLastRewardedAdAt) {
+            Cubiqo.Storage.setLastRewardedAdAt(Date.now());
+          }
+          if (Cubiqo.Audio && Cubiqo.Audio.setAdMute) Cubiqo.Audio.setAdMute(false);
+          if (Cubiqo.UI && Cubiqo.UI.setAdActive) Cubiqo.UI.setAdActive(false);
+          resolve(ok);
+        }
+
         try {
           sdk.ad.requestAd('rewarded', {
-            adFinished: function () { resolve(true); },
-            adError: function () { resolve(false); }
+            adStarted: function () {
+              self.gameplayStop();
+              if (Cubiqo.Audio && Cubiqo.Audio.setAdMute) Cubiqo.Audio.setAdMute(true);
+              if (Cubiqo.UI && Cubiqo.UI.setAdActive) Cubiqo.UI.setAdActive(true);
+            },
+            adFinished: function () {
+              done(true);
+            },
+            adError: function () {
+              done(false);
+            }
           });
-        } catch (e) { resolve(false); }
+        } catch (e) {
+          done(false);
+        }
       });
+
+      return this._adPending;
+    },
+    showRewardedHint: function () {
+      return this.showRewardedAd();
     },
     showInterstitial: function () {
       var self = this;
@@ -235,6 +277,7 @@
       return Promise.resolve(this.ready);
     },
     isAvailable: function () { return MONETIZATION.enabled && MONETIZATION.adRequestsEnabled && this.ready && !!this.sdk && onlineOk(); },
+    isRewardedAvailable: function () { return MONETIZATION.rewardedAdsEnabled && this.isAvailable() && !!this.sdk && !!this.sdk.rewardedBreak; },
     showRewardedHint: function () {
       if (!this.isAvailable() || !this.sdk.showAd) return Promise.resolve(false);
       return Promise.resolve(this.sdk.showAd('rewarded'))
@@ -305,6 +348,9 @@
     whenReady: function () { return initPromise || Promise.resolve(false); },
     current: function () { return active; },
     isAvailable: function () { return active.isAvailable(); },
+    isRewardedAvailable: function () { return active.isRewardedAvailable ? active.isRewardedAvailable() : false; },
+    getRewardedCooldownRemaining: function () { return active.getRewardedCooldownRemaining ? active.getRewardedCooldownRemaining() : 0; },
+    showRewardedAd: function () { return active.showRewardedAd ? active.showRewardedAd() : active.showRewardedHint(); },
     showRewardedHint: function () { return active.showRewardedHint(); },
     showInterstitial: function () { return active.showInterstitial(); },
     pauseGame: function () { active.pauseGame(); },

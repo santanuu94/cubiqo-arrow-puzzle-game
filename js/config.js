@@ -49,14 +49,25 @@
     /* Fully online architecture: internet connection required to launch & play */
     ONLINE_REQUIRED: true,
 
-    /* Portal SDK & Monetization config (Stage 2: midgame ads via portal SDK; hints stay free) */
+    /* Portal SDK & Monetization config (Stage 3: midgame + rewarded ads via portal SDK) */
     MONETIZATION: {
       enabled: true,
       hintsFree: true,
       adRequestsEnabled: true,
       midgameAdsEnabled: true,
-      rewardedAdsEnabled: false,
+      rewardedAdsEnabled: true,
+      rewardedCooldownMs: 90000,
       portalDetection: true
+    },
+
+    /* Gameplay-earned economy & non-ad alternatives */
+    ECONOMY: {
+      levelClearCoins: 10,
+      threeStarBonusCoins: 5,
+      milestoneBonusCoins: 50,
+      dailyClearCoins: 25,
+      heartCostCoins: 30,
+      hintCostCoins: 20
     },
 
     /* Milestone celebration levels (PRD section 7E) */

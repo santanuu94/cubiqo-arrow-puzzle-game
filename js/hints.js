@@ -50,14 +50,14 @@
    * Request a hint. In development mode (or when ads are disabled),
    * hints are immediately granted without advertising.
    */
-  function requestHint(board) {
+  function requestHint(board, options) {
     if (Cubiqo.Network && !Cubiqo.Network.isOnline()) {
       return Promise.resolve({ ok: false, reason: 'offline' });
     }
     var arrow = pickValidHint(board);
     if (!arrow) return Promise.resolve({ ok: false, reason: 'none' });
 
-    if (Config.MONETIZATION.rewardedAdsEnabled && Cubiqo.Platform.isAvailable()) {
+    if (options && options.useAd && Config.MONETIZATION.rewardedAdsEnabled && Cubiqo.Platform.isRewardedAvailable()) {
       Cubiqo.Analytics.track('hint_requested', { mode: 'rewarded' });
       return Cubiqo.Platform.showRewardedHint().then(function (rewarded) {
         if (rewarded !== true) return { ok: false, reason: 'ad-unavailable' };
@@ -66,12 +66,8 @@
       });
     }
 
-    if (Config.MONETIZATION.hintsFree) {
-      Cubiqo.Analytics.track('hint_requested', { mode: 'free' });
-      return Promise.resolve({ ok: true, arrow: arrow });
-    }
-
-    return Promise.resolve({ ok: false, reason: 'ad-unavailable' });
+    Cubiqo.Analytics.track('hint_requested', { mode: 'free' });
+    return Promise.resolve({ ok: true, arrow: arrow });
   }
 
   Cubiqo.Hints = {

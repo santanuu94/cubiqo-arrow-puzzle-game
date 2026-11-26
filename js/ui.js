@@ -34,6 +34,8 @@
     completedOnce: false,
     adActive: false,
     adPending: false,
+    revivedWithAd: false,
+    freeHintUsed: false,
     lastCompleteInfo: null,
     toastTimer: null,
     runToken: 0,
@@ -161,6 +163,7 @@
             '<div class="stat-pill"><span class="stat-pill__label">Unlocked</span><span class="stat-pill__val">Lv ' + save.highestUnlocked + '</span></div>' +
             '<div class="stat-pill"><span class="stat-pill__label">Cleared</span><span class="stat-pill__val">' + completed + '/100</span></div>' +
             '<div class="stat-pill"><span class="stat-pill__label">Stars</span><span class="stat-pill__val">★ ' + save.totalStars + '/300</span></div>' +
+            '<div class="stat-pill"><span class="stat-pill__label">Coins</span><span class="stat-pill__val">🪙 ' + (save.coins || 0) + '</span></div>' +
           '</div>' +
 
           '<div class="overall-progress" aria-label="Overall progress ' + completed + ' percent">' +
@@ -452,10 +455,31 @@
         '<div class="modal-card">' +
           '<div class="gameover-hearts">💔</div>' +
           '<h2>OUT OF HEARTS!</h2>' +
-          '<p class="modal-sub">' + title + ' • No lifelines remaining.</p>' +
+          '<p class="modal-sub">' + title + ' • <strong id="goCoins">🪙 ' + Storage.getCoins() + ' Coins</strong></p>' +
+          '<div class="gameover-recover-row" id="goRecoverRow">' +
+            '<button class="btn btn-ad" id="btnReviveAd">🎬 +1 Heart<small>Watch Ad</small></button>' +
+            '<button class="btn btn-coins" id="btnReviveCoins">🪙 +1 Heart<small>' + ((Config.ECONOMY && Config.ECONOMY.heartCostCoins) || 30) + ' Coins</small></button>' +
+          '</div>' +
+          '<p class="reward-note" id="goAdMsg"></p>' +
           '<div class="modal-actions">' +
             '<button class="btn btn-primary btn-xl" id="btnRetryGameOver">↻ Replay Level</button>' +
             '<button class="btn btn-ghost" id="btnGameOverHome">🏠 Home</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    var hintModalHtml =
+      '<div class="modal-backdrop" id="hintModal" style="display:none" role="dialog" aria-modal="true">' +
+        '<div class="modal-card">' +
+          '<h2>EXTRA HINT</h2>' +
+          '<p class="modal-sub">Free hint used for this level. <strong id="hintCoins">🪙 ' + Storage.getCoins() + ' Coins</strong></p>' +
+          '<div class="gameover-recover-row">' +
+            '<button class="btn btn-ad" id="btnHintAd">🎬 +1 Hint<small>Watch Ad</small></button>' +
+            '<button class="btn btn-coins" id="btnHintCoins">🪙 +1 Hint<small>' + ((Config.ECONOMY && Config.ECONOMY.hintCostCoins) || 20) + ' Coins</small></button>' +
+          '</div>' +
+          '<p class="reward-note" id="hintAdMsg"></p>' +
+          '<div class="modal-actions">' +
+            '<button class="btn btn-ghost" id="btnHintCancel">Continue Without Hint</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -502,6 +526,7 @@
         '<div class="toast-slot" id="toastSlot" aria-live="polite"></div>' +
         pauseHtml +
         gameOverHtml +
+        hintModalHtml +
       '</div>';
 
     document.getElementById('btnPause').addEventListener('click', function () {
@@ -533,6 +558,7 @@
     var btnRetryGo = document.getElementById('btnRetryGameOver');
     if (btnRetryGo) {
       btnRetryGo.addEventListener('click', function () {
+        if (state.adPending || state.adActive) return;
         Audio.playClick();
         restartCurrent();
       });
@@ -540,10 +566,108 @@
     var btnGoHome = document.getElementById('btnGameOverHome');
     if (btnGoHome) {
       btnGoHome.addEventListener('click', function () {
+        if (state.adPending || state.adActive) return;
         Audio.playClick();
         state.gameOver = false;
         Platform.gameplayStop();
         navigate('home');
+      });
+    }
+    var btnReviveAd = document.getElementById('btnReviveAd');
+    if (btnReviveAd) {
+      btnReviveAd.addEventListener('click', function () {
+        if (state.adPending || state.adActive || state.revivedWithAd) return;
+        if (!Platform.isRewardedAvailable() || Platform.getRewardedCooldownRemaining() > 0) {
+          refreshGameOverModal();
+          return;
+        }
+        Audio.playClick();
+        state.adPending = true;
+        btnReviveAd.disabled = true;
+        var msgEl = document.getElementById('goAdMsg');
+        if (msgEl) msgEl.textContent = '';
+        Platform.showRewardedAd().then(function (rewarded) {
+          state.adPending = false;
+          if (rewarded === true) {
+            state.revivedWithAd = true;
+            reviveWithHeart('ad');
+          } else {
+            if (msgEl) msgEl.textContent = 'Advertisement unavailable right now. Use coins or replay.';
+            refreshGameOverModal();
+          }
+        }).catch(function () {
+          state.adPending = false;
+          if (msgEl) msgEl.textContent = 'Advertisement unavailable right now. Use coins or replay.';
+          refreshGameOverModal();
+        });
+      });
+    }
+    var btnReviveCoins = document.getElementById('btnReviveCoins');
+    if (btnReviveCoins) {
+      btnReviveCoins.addEventListener('click', function () {
+        if (state.adPending || state.adActive) return;
+        var cost = (Config.ECONOMY && Config.ECONOMY.heartCostCoins) || 30;
+        if (Storage.spendCoins(cost)) {
+          Audio.playClick();
+          reviveWithHeart('coins');
+        } else {
+          refreshGameOverModal();
+        }
+      });
+    }
+
+    var btnHintAd = document.getElementById('btnHintAd');
+    if (btnHintAd) {
+      btnHintAd.addEventListener('click', function () {
+        if (state.adPending || state.adActive) return;
+        if (!Platform.isRewardedAvailable() || Platform.getRewardedCooldownRemaining() > 0) {
+          refreshHintModal();
+          return;
+        }
+        Audio.playClick();
+        state.adPending = true;
+        btnHintAd.disabled = true;
+        var msgEl = document.getElementById('hintAdMsg');
+        if (msgEl) msgEl.textContent = '';
+        Platform.showRewardedAd().then(function (rewarded) {
+          state.adPending = false;
+          if (rewarded === true) {
+            Storage.addHints(1);
+            closeHintModalAndApply();
+          } else {
+            if (msgEl) msgEl.textContent = 'Advertisement unavailable right now. Use coins or continue.';
+            refreshHintModal();
+          }
+        }).catch(function () {
+          state.adPending = false;
+          if (msgEl) msgEl.textContent = 'Advertisement unavailable right now. Use coins or continue.';
+          refreshHintModal();
+        });
+      });
+    }
+    var btnHintCoins = document.getElementById('btnHintCoins');
+    if (btnHintCoins) {
+      btnHintCoins.addEventListener('click', function () {
+        if (state.adPending || state.adActive) return;
+        var cost = (Config.ECONOMY && Config.ECONOMY.hintCostCoins) || 20;
+        if (Storage.spendCoins(cost)) {
+          Audio.playClick();
+          Storage.addHints(1);
+          closeHintModalAndApply();
+        } else {
+          refreshHintModal();
+        }
+      });
+    }
+    var btnHintCancel = document.getElementById('btnHintCancel');
+    if (btnHintCancel) {
+      btnHintCancel.addEventListener('click', function () {
+        if (state.adPending || state.adActive) return;
+        Audio.playClick();
+        var hm = document.getElementById('hintModal');
+        if (hm) hm.style.display = 'none';
+        state.paused = false;
+        Platform.gameplayStart();
       });
     }
 
@@ -646,6 +770,7 @@
             '<div class="c-stat"><span>Moves Used</span><strong>' + state.moves + '</strong></div>' +
             (rec ? '<div class="c-stat"><span>Best Moves</span><strong>' + rec.bestMoves + '</strong></div>' : '') +
             (state.isDaily && dailyStatus && dailyStatus.record ? '<div class="c-stat"><span>Today\'s Best</span><strong>' + dailyStatus.record.moves + ' moves</strong></div>' : '') +
+            (info.coinsEarned > 0 ? '<div class="c-stat"><span>Coins Earned</span><strong>+' + info.coinsEarned + ' 🪙</strong></div>' : '') +
             '<div class="c-stat"><span>3-Star Target</span><strong>≤ ' + lv.stars.three + '</strong></div>' +
           '</div>' +
           '<div class="complete-actions">' +
@@ -869,6 +994,10 @@
     state.hintArrowId = null;
     state.animating = false;
     state.completedOnce = false;
+    state.revivedWithAd = false;
+    state.freeHintUsed = false;
+    state.adPending = false;
+    state.adActive = false;
     Platform.gameplayStart();
     Analytics.track('level_started', { level: lv.id, isDaily: false });
     navigate('gameplay');
@@ -894,6 +1023,10 @@
     state.hintArrowId = null;
     state.animating = false;
     state.completedOnce = false;
+    state.revivedWithAd = false;
+    state.freeHintUsed = false;
+    state.adPending = false;
+    state.adActive = false;
     Platform.gameplayStart();
     Analytics.track('level_started', { level: lv.id, isDaily: true });
     navigate('gameplay');
@@ -1002,6 +1135,7 @@
           reason: 'out_of_hearts'
         });
         showToast('Out of hearts! Level failed.', 'error');
+        refreshGameOverModal();
         var goModal = document.getElementById('gameOverModal');
         if (goModal) {
           goModal.style.display = 'flex';
@@ -1060,7 +1194,8 @@
     var stars = Cubiqo.LevelGenerator.starsForMoves(state.moves, lv.stars);
     if (state.isDaily) {
       var dRes = Daily.completeToday(state.moves, stars);
-      state.lastCompleteInfo = { isFirstClaim: !!dRes.isFirstClaim, streak: dRes.streak };
+      var dailyCoins = dRes.isFirstClaim ? ((Config.ECONOMY && Config.ECONOMY.dailyClearCoins) || 25) : 0;
+      state.lastCompleteInfo = { isFirstClaim: !!dRes.isFirstClaim, streak: dRes.streak, coinsEarned: dailyCoins };
     } else {
       var cRes = Storage.completeLevel(state.levelId, state.moves, stars);
       state.lastCompleteInfo = cRes;
@@ -1081,8 +1216,83 @@
     }, Config.TIMING.completionDelay);
   }
 
-  function triggerHint() {
-    if (state.screen !== 'gameplay' || state.paused || state.gameOver || state.completedOnce) return;
+  function refreshGameOverModal() {
+    var coinsEl = document.getElementById('goCoins');
+    var coins = Storage.getCoins();
+    if (coinsEl) coinsEl.textContent = '🪙 ' + coins + ' Coins';
+
+    var cost = (Config.ECONOMY && Config.ECONOMY.heartCostCoins) || 30;
+    var btnCoins = document.getElementById('btnReviveCoins');
+    if (btnCoins) {
+      btnCoins.disabled = coins < cost;
+      btnCoins.innerHTML = '🪙 +1 Heart<small>' + (coins >= cost ? cost + ' Coins' : 'Need ' + cost + ' Coins') + '</small>';
+    }
+
+    var btnAd = document.getElementById('btnReviveAd');
+    var msgEl = document.getElementById('goAdMsg');
+    if (btnAd) {
+      var canOfferAd = Platform.isRewardedAvailable() && !state.revivedWithAd;
+      if (!canOfferAd) {
+        btnAd.style.display = 'none';
+      } else {
+        btnAd.style.display = '';
+        var cd = Platform.getRewardedCooldownRemaining();
+        btnAd.disabled = cd > 0;
+        btnAd.innerHTML = '🎬 +1 Heart<small>' + (cd > 0 ? 'Wait ' + cd + 's' : 'Watch Ad') + '</small>';
+        if (cd > 0 && msgEl && !msgEl.textContent) {
+          msgEl.textContent = 'Rewarded ad cooldown: ' + cd + 's remaining.';
+        }
+      }
+    }
+  }
+
+  function reviveWithHeart(source) {
+    state.lives = 1;
+    state.gameOver = false;
+    var livesEl = document.getElementById('hudLives');
+    if (livesEl) {
+      livesEl.innerHTML = renderHeartsHtml(state.lives, state.maxLives);
+      var restored = livesEl.querySelector('[data-heart-idx="0"]');
+      if (restored) restored.classList.add('is-restored');
+    }
+    var goModal = document.getElementById('gameOverModal');
+    if (goModal) goModal.style.display = 'none';
+    Audio.playStar(2);
+    Platform.gameplayStart();
+    Analytics.track('heart_restored', { level: state.levelId, source: source });
+    showToast('♥ +1 Heart Restored! Keep going!', 'info');
+  }
+
+  function refreshHintModal() {
+    var coinsEl = document.getElementById('hintCoins');
+    var coins = Storage.getCoins();
+    if (coinsEl) coinsEl.textContent = '🪙 ' + coins + ' Coins';
+
+    var cost = (Config.ECONOMY && Config.ECONOMY.hintCostCoins) || 20;
+    var btnCoins = document.getElementById('btnHintCoins');
+    if (btnCoins) {
+      btnCoins.disabled = coins < cost;
+      btnCoins.innerHTML = '🪙 +1 Hint<small>' + (coins >= cost ? cost + ' Coins' : 'Need ' + cost + ' Coins') + '</small>';
+    }
+
+    var btnAd = document.getElementById('btnHintAd');
+    var msgEl = document.getElementById('hintAdMsg');
+    if (btnAd) {
+      if (!Platform.isRewardedAvailable()) {
+        btnAd.style.display = 'none';
+      } else {
+        btnAd.style.display = '';
+        var cd = Platform.getRewardedCooldownRemaining();
+        btnAd.disabled = cd > 0;
+        btnAd.innerHTML = '🎬 +1 Hint<small>' + (cd > 0 ? 'Wait ' + cd + 's' : 'Watch Ad') + '</small>';
+        if (cd > 0 && msgEl && !msgEl.textContent) {
+          msgEl.textContent = 'Rewarded ad cooldown: ' + cd + 's remaining.';
+        }
+      }
+    }
+  }
+
+  function applyHintOnBoard() {
     var token = state.runToken;
     Hints.requestHint(state.board).then(function (res) {
       if (token !== state.runToken || state.screen !== 'gameplay' || state.paused || state.gameOver || state.completedOnce) return;
@@ -1097,12 +1307,43 @@
         showToast('Tap the highlighted arrow to clear it!', 'hint');
       } else if (res.reason === 'offline') {
         showOfflineGate();
-      } else if (res.reason === 'ad-unavailable') {
-        showToast('Rewarded hint unavailable right now. Try again shortly.', 'error');
       } else {
         showToast('No removable arrows available.', 'error');
       }
     });
+  }
+
+  function closeHintModalAndApply() {
+    var hm = document.getElementById('hintModal');
+    if (hm) hm.style.display = 'none';
+    state.paused = false;
+    Platform.gameplayStart();
+    if (Storage.consumeHint()) {
+      applyHintOnBoard();
+    }
+  }
+
+  function triggerHint() {
+    if (state.screen !== 'gameplay' || state.paused || state.gameOver || state.completedOnce || state.adActive || state.adPending) return;
+    if (Config.ONLINE_REQUIRED && Cubiqo.Network && !Cubiqo.Network.isOnline()) {
+      showOfflineGate();
+      return;
+    }
+    if (!state.freeHintUsed) {
+      state.freeHintUsed = true;
+      applyHintOnBoard();
+      return;
+    }
+    if (Storage.consumeHint()) {
+      applyHintOnBoard();
+      return;
+    }
+    // Outside active gameplay: pause before showing optional Ad / Coin hint modal
+    state.paused = true;
+    Platform.gameplayStop();
+    refreshHintModal();
+    var hm = document.getElementById('hintModal');
+    if (hm) hm.style.display = 'flex';
   }
 
   function showToast(msg, kind) {
