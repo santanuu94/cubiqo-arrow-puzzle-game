@@ -23,6 +23,14 @@
     "crazygames",
     "gamedistribution"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/santanuu94/cubiqo-arrow-puzzle-game.git"
+  },
+  "bugs": {
+    "url": "https://github.com/santanuu94/cubiqo-arrow-puzzle-game/issues"
+  },
+  "homepage": "https://github.com/santanuu94/cubiqo-arrow-puzzle-game#readme",
   "license": "MIT",
   "devDependencies": {
     "playwright": "^1.49.1",

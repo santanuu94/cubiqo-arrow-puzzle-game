@@ -2,3 +2,10 @@ node_modules/
 dist/
 .keep
 *.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.local
+test-results/
+playwright-report/
