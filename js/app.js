@@ -46,10 +46,10 @@
           }
         });
       }
-      Cubiqo.UI.render();
       if (!Cubiqo.Network || Cubiqo.Network.isOnline()) {
         Cubiqo.Platform.initialize().catch(function () {});
       }
+      Cubiqo.UI.render();
     } catch (err) {
       showFatalRecovery();
       return;

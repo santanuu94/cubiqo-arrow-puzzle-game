@@ -14,6 +14,7 @@
   var musicGain = null;
   var musicActive = false;
   var chordIdx = 0;
+  var platformMuted = false;
 
   var CHORDS = [
     [261.63, 329.63, 392.00], /* Cmaj */
@@ -52,7 +53,7 @@
   }
 
   function tone(freq, dur, type, vol, delay) {
-    if (!Storage.getSettings().sound) return;
+    if (platformMuted || !Storage.getSettings().sound) return;
     var c = getCtx();
     if (!c) return;
     unlock();
@@ -195,8 +196,14 @@
   }
 
   function syncMusic() {
-    if (Storage.getSettings().music) startMusic();
+    if (!platformMuted && Storage.getSettings().music) startMusic();
     else stopMusic();
+  }
+
+  function setPlatformMute(muted) {
+    platformMuted = !!muted;
+    if (platformMuted) stopMusic();
+    else syncMusic();
   }
 
   Cubiqo.Audio = {
@@ -212,6 +219,8 @@
     playVictory: playVictory,
     haptic: haptic,
     syncMusic: syncMusic,
-    stopMusic: stopMusic
+    stopMusic: stopMusic,
+    setPlatformMute: setPlatformMute,
+    isPlatformMuted: function () { return platformMuted; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -16,6 +16,7 @@ const Cubiqo = loadGame([
   'js/puzzle.js',
   'js/level-generator.js',
   'js/levels.js',
+  'js/audio.js',
   'js/platform.js',
   'js/analytics.js',
   'js/hints.js',
@@ -346,6 +347,80 @@ await test('portal SDK failures are handled gracefully and never fake rewarded a
     Config.MONETIZATION.adRequestsEnabled = prevAdReq;
     if (prevPoki === undefined) delete globalThis.PokiSDK;
     else globalThis.PokiSDK = prevPoki;
+    await Platform.initialize('dev');
+  }
+});
+
+await test('CrazyGames SDK v3 handles init, environments, lifecycle, and muteAudio', async () => {
+  const prevCG = globalThis.CrazyGames;
+  try {
+    // 1. Disabled environment safely blocks all SDK calls
+    let calls = [];
+    globalThis.CrazyGames = {
+      SDK: {
+        environment: 'disabled',
+        init: async () => {},
+        game: {
+          loadingStart: () => calls.push('loadingStart'),
+          loadingStop: () => calls.push('loadingStop'),
+          gameplayStart: () => calls.push('gameplayStart'),
+          gameplayStop: () => calls.push('gameplayStop')
+        }
+      }
+    };
+    assert.equal(await Platform.initialize('crazygames'), false);
+    assert.equal(Platform.getEnvironment(), 'disabled');
+    Platform.gameLoadingFinished();
+    Platform.gameplayStart();
+    Platform.gameplayStop();
+    assert.deepEqual(calls, []);
+
+    // 2. Local / CrazyGames environment: loading, lifecycle deduplication, and muteAudio
+    calls = [];
+    let settingsCb = null;
+    globalThis.CrazyGames = {
+      SDK: {
+        environment: 'local',
+        init: async () => {},
+        game: {
+          settings: { muteAudio: true },
+          addSettingsChangeListener: (cb) => { settingsCb = cb; },
+          loadingStart: () => calls.push('loadingStart'),
+          loadingStop: () => calls.push('loadingStop'),
+          gameplayStart: () => calls.push('gameplayStart'),
+          gameplayStop: () => calls.push('gameplayStop')
+        }
+      }
+    };
+    assert.equal(await Platform.initialize('crazygames'), true);
+    assert.equal(Platform.getEnvironment(), 'local');
+    assert.equal(Cubiqo.Audio.isPlatformMuted(), true);
+    assert.equal(Platform.isAvailable(), false); // ads disabled in Stage 1
+
+    // Settings change listener updates muteAudio dynamically
+    assert.ok(settingsCb);
+    settingsCb({ muteAudio: false });
+    assert.equal(Cubiqo.Audio.isPlatformMuted(), false);
+    settingsCb({ muteAudio: true });
+    assert.equal(Cubiqo.Audio.isPlatformMuted(), true);
+    settingsCb({ muteAudio: false });
+
+    // Loading & gameplay lifecycle events never duplicate and respect 1s SDK throttle
+    Platform.gameLoadingStart(); // already called by initialize()
+    Platform.gameLoadingFinished();
+    Platform.gameLoadingFinished();
+    Platform.gameplayStart();
+    Platform.gameplayStart(); // duplicate ignored
+    assert.deepEqual(calls, ['loadingStart', 'loadingStop', 'gameplayStart']);
+    Platform.pauseGame();
+    Platform.resumeGame();
+    Platform.gameplayStop();
+    // Rapid pause/resume/stop within 1000ms is throttled rather than spamming CrazyGames SDK
+    assert.equal(calls.length, 3);
+  } finally {
+    Cubiqo.Audio.setPlatformMute(false);
+    if (prevCG === undefined) delete globalThis.CrazyGames;
+    else globalThis.CrazyGames = prevCG;
     await Platform.initialize('dev');
   }
 });

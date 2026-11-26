@@ -14,14 +14,16 @@
     return !Cubiqo.Network || Cubiqo.Network.isOnline();
   }
 
-  function DevAdapter() { this.name = 'dev'; this.ready = true; }
+  function DevAdapter() { this.name = 'dev'; this.ready = true; this.environment = 'local'; }
   DevAdapter.prototype = {
     initialize: function () { this.ready = true; return Promise.resolve(true); },
+    getEnvironment: function () { return this.environment; },
     isAvailable: function () { return false; },
     showRewardedHint: function () { return Promise.resolve(false); },
     showInterstitial: function () { return Promise.resolve(false); },
     pauseGame: function () {},
     resumeGame: function () {},
+    gameLoadingStart: function () {},
     gameLoadingFinished: function () {},
     gameplayStart: function () {},
     gameplayStop: function () {},
@@ -61,24 +63,66 @@
     loadCloud: function () { return Promise.resolve(null); }
   };
 
-  function CrazyGamesAdapter() { this.name = 'crazygames'; this.sdk = null; this.ready = false; }
+  function CrazyGamesAdapter() {
+    this.name = 'crazygames';
+    this.sdk = null;
+    this.ready = false;
+    this.environment = 'disabled';
+    this.loadingStarted = false;
+    this.loadingStopped = false;
+    this.gameplayActive = false;
+    this._lastGameplayCallAt = 0;
+    this._gameplayTimer = null;
+    this._settingsListener = null;
+  }
   CrazyGamesAdapter.prototype = {
     initialize: function () {
       var self = this;
       this.sdk = (global.CrazyGames && global.CrazyGames.SDK) || null;
-      if (!this.sdk || !this.sdk.init) { self.ready = false; return Promise.resolve(false); }
+      if (!this.sdk || typeof this.sdk.init !== 'function') {
+        self.ready = false;
+        self.environment = 'disabled';
+        return Promise.resolve(false);
+      }
       return this.sdk.init().then(function () {
+        var env = self.sdk.environment || 'disabled';
+        self.environment = env;
+        if (env === 'disabled') {
+          self.ready = false;
+          return false;
+        }
         self.ready = true;
+
+        var gameMod = self.sdk.game;
+        if (gameMod) {
+          if (gameMod.settings && Cubiqo.Audio && Cubiqo.Audio.setPlatformMute) {
+            Cubiqo.Audio.setPlatformMute(!!gameMod.settings.muteAudio);
+          }
+          if (typeof gameMod.addSettingsChangeListener === 'function' && !self._settingsListener) {
+            self._settingsListener = function (newSettings) {
+              if (Cubiqo.Audio && Cubiqo.Audio.setPlatformMute) {
+                Cubiqo.Audio.setPlatformMute(!!(newSettings && newSettings.muteAudio));
+              }
+            };
+            try { gameMod.addSettingsChangeListener(self._settingsListener); } catch (e) {}
+          }
+        }
         return true;
       }).catch(function () {
         self.ready = false;
+        self.environment = 'disabled';
         return false;
       });
     },
-    isAvailable: function () { return MONETIZATION.enabled && MONETIZATION.adRequestsEnabled && this.ready && !!this.sdk && onlineOk(); },
+    getEnvironment: function () { return this.environment; },
+    isAvailable: function () {
+      return MONETIZATION.enabled && MONETIZATION.adRequestsEnabled && this.ready &&
+        this.environment !== 'disabled' && !!this.sdk && onlineOk();
+    },
     showRewardedHint: function () {
       var sdk = this.sdk;
       if (!this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) return Promise.resolve(false);
+      this.gameplayStop();
       return new Promise(function (resolve) {
         try {
           sdk.ad.requestAd('rewarded', {
@@ -91,6 +135,7 @@
     showInterstitial: function () {
       var sdk = this.sdk;
       if (!this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) return Promise.resolve(false);
+      this.gameplayStop();
       return new Promise(function (resolve) {
         try {
           sdk.ad.requestAd('midgame', {
@@ -100,11 +145,54 @@
         } catch (e) { resolve(false); }
       });
     },
-    pauseGame: function () { if (this.sdk && this.sdk.gameplay && this.sdk.gameplay.stop) this.sdk.gameplay.stop(); },
-    resumeGame: function () { if (this.sdk && this.sdk.gameplay && this.sdk.gameplay.start) this.sdk.gameplay.start(); },
-    gameLoadingFinished: function () { if (this.sdk && this.sdk.game && this.sdk.game.loadingStop) this.sdk.game.loadingStop(); },
-    gameplayStart: function () { if (this.sdk && this.sdk.gameplay && this.sdk.gameplay.start) this.sdk.gameplay.start(); },
-    gameplayStop: function () { if (this.sdk && this.sdk.gameplay && this.sdk.gameplay.stop) this.sdk.gameplay.stop(); },
+    pauseGame: function () { this.gameplayStop(); },
+    resumeGame: function () { this.gameplayStart(); },
+    gameLoadingStart: function () {
+      if (!this.ready || this.environment === 'disabled' || this.loadingStarted || this.loadingStopped) return;
+      this.loadingStarted = true;
+      try { if (this.sdk && this.sdk.game && this.sdk.game.loadingStart) this.sdk.game.loadingStart(); } catch (e) {}
+    },
+    gameLoadingFinished: function () {
+      if (!this.ready || this.environment === 'disabled' || this.loadingStopped) return;
+      if (!this.loadingStarted) this.gameLoadingStart();
+      this.loadingStopped = true;
+      try { if (this.sdk && this.sdk.game && this.sdk.game.loadingStop) this.sdk.game.loadingStop(); } catch (e) {}
+    },
+    _emitGameplay: function (targetActive) {
+      var self = this;
+      if (!this.ready || this.environment === 'disabled') return;
+      if (this._gameplayTimer) {
+        clearTimeout(this._gameplayTimer);
+        this._gameplayTimer = null;
+      }
+      var send = function () {
+        self._lastGameplayCallAt = Date.now();
+        try {
+          if (!self.sdk || !self.sdk.game) return;
+          if (targetActive && self.sdk.game.gameplayStart) self.sdk.game.gameplayStart();
+          else if (!targetActive && self.sdk.game.gameplayStop) self.sdk.game.gameplayStop();
+        } catch (e) {}
+      };
+      var elapsed = Date.now() - this._lastGameplayCallAt;
+      if (this._lastGameplayCallAt === 0 || elapsed >= 1050) {
+        send();
+      } else {
+        this._gameplayTimer = setTimeout(function () {
+          self._gameplayTimer = null;
+          if (self.gameplayActive === targetActive) send();
+        }, 1050 - elapsed);
+      }
+    },
+    gameplayStart: function () {
+      if (!this.ready || this.environment === 'disabled' || this.gameplayActive) return;
+      this.gameplayActive = true;
+      this._emitGameplay(true);
+    },
+    gameplayStop: function () {
+      if (!this.ready || this.environment === 'disabled' || !this.gameplayActive) return;
+      this.gameplayActive = false;
+      this._emitGameplay(false);
+    },
     saveCloud: function () { return Promise.resolve(false); },
     loadCloud: function () { return Promise.resolve(null); }
   };
@@ -157,28 +245,41 @@
 
   var active = new DevAdapter();
   var sdkStatus = 'uninitialized';
+  var initPromise = null;
 
   Cubiqo.Platform = {
     detectPortal: detectPortal,
     createAdapter: createAdapter,
-    getStatus: function () { return { portal: active.name, status: sdkStatus, available: active.isAvailable() }; },
+    getEnvironment: function () { return active.getEnvironment ? active.getEnvironment() : 'local'; },
+    getStatus: function () {
+      return {
+        portal: active.name,
+        environment: active.getEnvironment ? active.getEnvironment() : 'local',
+        status: sdkStatus,
+        available: active.isAvailable()
+      };
+    },
     initialize: function (portal) {
       active = createAdapter(portal);
-      return active.initialize().then(function (ok) {
+      initPromise = active.initialize().then(function (ok) {
         sdkStatus = ok ? 'ready' : 'failed';
+        if (ok && active.gameLoadingStart) active.gameLoadingStart();
         return !!ok;
       }).catch(function () {
         sdkStatus = 'failed';
         active = new DevAdapter();
         return false;
       });
+      return initPromise;
     },
+    whenReady: function () { return initPromise || Promise.resolve(false); },
     current: function () { return active; },
     isAvailable: function () { return active.isAvailable(); },
     showRewardedHint: function () { return active.showRewardedHint(); },
     showInterstitial: function () { return active.showInterstitial(); },
     pauseGame: function () { active.pauseGame(); },
     resumeGame: function () { active.resumeGame(); },
+    gameLoadingStart: function () { if (active.gameLoadingStart) active.gameLoadingStart(); },
     gameLoadingFinished: function () { active.gameLoadingFinished(); },
     gameplayStart: function () { active.gameplayStart(); },
     gameplayStop: function () { active.gameplayStop(); },

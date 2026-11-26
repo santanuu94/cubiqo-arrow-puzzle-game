@@ -118,7 +118,8 @@
       ? Cubiqo.Network.check()
       : Promise.resolve(true);
 
-    netCheck.then(function (isOnline) {
+    Promise.all([netCheck, Platform.whenReady ? Platform.whenReady() : Promise.resolve(true)]).then(function (results) {
+      var isOnline = results[0];
       if (!isOnline) {
         showOfflineGate();
         return;
