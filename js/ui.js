@@ -93,6 +93,7 @@
 
   function navigate(screen) {
     clearPendingTimers();
+    if (Platform.clearAllBanners) Platform.clearAllBanners();
     state.runToken += 1;
     state.screen = screen;
     render();
@@ -249,6 +250,9 @@
           '<span class="top-bar__meta">' + completedCount + '/100</span>' +
         '</header>' +
         '<div class="levels-grid" id="levelsGrid">' + tilesHtml + '</div>' +
+        '<div class="banner-slot" id="bannerSlot" aria-label="Advertisement">' +
+          '<div class="banner-container" id="responsive-banner-container"></div>' +
+        '</div>' +
       '</div>';
 
     document.getElementById('btnLevelsBack').addEventListener('click', function () {
@@ -263,9 +267,25 @@
       });
     });
 
+    var token = state.runToken;
     requestAnimationFrame(function () {
       var cur = document.getElementById('lvlTile-' + save.highestUnlocked);
       if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+      var slot = document.getElementById('bannerSlot');
+      if (slot && Platform.isBannerAvailable && Platform.isBannerAvailable()) {
+        slot.classList.add('is-active');
+        Platform.requestResponsiveBanner('responsive-banner-container').then(function (res) {
+          if (token !== state.runToken || state.screen !== 'levelSelect') {
+            Platform.clearAllBanners();
+            return;
+          }
+          if (!res || !res.ok) {
+            var s = document.getElementById('bannerSlot');
+            if (s) s.classList.remove('is-active');
+          }
+        });
+      }
     });
   }
 

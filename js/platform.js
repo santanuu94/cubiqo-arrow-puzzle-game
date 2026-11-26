@@ -75,6 +75,9 @@
     this._lastGameplayCallAt = 0;
     this._gameplayTimer = null;
     this._adPending = null;
+    this._lastBannerAt = {};
+    this._bannerInFlight = false;
+    this._bannersDisabledSession = false;
     this._settingsListener = null;
   }
   CrazyGamesAdapter.prototype = {
@@ -176,6 +179,53 @@
     },
     showRewardedHint: function () {
       return this.showRewardedAd();
+    },
+    isBannerAvailable: function () {
+      return MONETIZATION.bannerAdsEnabled && this.isAvailable() && !this._bannersDisabledSession &&
+        !!this.sdk && !!this.sdk.banner && typeof this.sdk.banner.requestResponsiveBanner === 'function';
+    },
+    requestResponsiveBanner: function (containerId) {
+      var self = this;
+      if (!containerId || !this.isBannerAvailable()) {
+        return Promise.resolve({ ok: false, code: 'bannersDisabled' });
+      }
+      if (this._adPending || this._bannerInFlight) {
+        return Promise.resolve({ ok: false, code: 'videoAdPlaying' });
+      }
+      if (typeof document !== 'undefined') {
+        var el = document.getElementById(containerId);
+        if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) {
+          return Promise.resolve({ ok: false, code: 'notVisible' });
+        }
+      }
+      var cd = MONETIZATION.bannerRefreshCooldownMs || 20000;
+      var lastAt = this._lastBannerAt[containerId] || 0;
+      if (lastAt > 0 && (Date.now() - lastAt) < cd) {
+        return Promise.resolve({ ok: false, code: 'bannerCooldown' });
+      }
+
+      this._bannerInFlight = true;
+      this._lastBannerAt[containerId] = Date.now();
+      return Promise.resolve().then(function () {
+        return self.sdk.banner.requestResponsiveBanner(containerId);
+      }).then(function () {
+        self._bannerInFlight = false;
+        return { ok: true };
+      }).catch(function (err) {
+        self._bannerInFlight = false;
+        var code = (err && err.code) ? String(err.code) : 'other';
+        if (code === 'bannersDisabled' || code === 'maxRefreshReached') {
+          self._bannersDisabledSession = true;
+        }
+        return { ok: false, code: code };
+      });
+    },
+    clearAllBanners: function () {
+      if (!this.ready || this.environment === 'disabled' || !this.sdk || !this.sdk.banner ||
+          typeof this.sdk.banner.clearAllBanners !== 'function') {
+        return;
+      }
+      try { this.sdk.banner.clearAllBanners(); } catch (e) {}
     },
     showInterstitial: function () {
       var self = this;
@@ -352,6 +402,11 @@
     getRewardedCooldownRemaining: function () { return active.getRewardedCooldownRemaining ? active.getRewardedCooldownRemaining() : 0; },
     showRewardedAd: function () { return active.showRewardedAd ? active.showRewardedAd() : active.showRewardedHint(); },
     showRewardedHint: function () { return active.showRewardedHint(); },
+    isBannerAvailable: function () { return active.isBannerAvailable ? active.isBannerAvailable() : false; },
+    requestResponsiveBanner: function (id) {
+      return active.requestResponsiveBanner ? active.requestResponsiveBanner(id) : Promise.resolve({ ok: false, code: 'bannersDisabled' });
+    },
+    clearAllBanners: function () { if (active.clearAllBanners) active.clearAllBanners(); },
     showInterstitial: function () { return active.showInterstitial(); },
     pauseGame: function () { active.pauseGame(); },
     resumeGame: function () { active.resumeGame(); },

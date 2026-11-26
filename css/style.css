@@ -1608,3 +1608,27 @@ body {
   min-height: 16px;
   margin-bottom: 10px;
 }
+
+/* ---- Stage 4 Responsive Banner Container (Non-Gameplay Only) ---- */
+.banner-slot {
+  display: none;
+  flex-shrink: 0;
+  padding: 8px 16px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.28);
+}
+.banner-slot.is-active {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.banner-container {
+  width: 100%;
+  max-width: 448px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+}

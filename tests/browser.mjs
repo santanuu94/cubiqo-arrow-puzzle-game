@@ -31,8 +31,21 @@ try {
 
     await page.goto(URL, { waitUntil: 'networkidle' });
     await page.waitForSelector('#btnHomePlay', { timeout: 5000 });
-    await page.click('#btnHomePlay');
+
+    // Check Level Select screen banner container fits inside #app & clears on gameplay entry
+    await page.click('#btnHomeLevels');
+    await page.waitForSelector('#levelsGrid');
+    await page.waitForSelector('#responsive-banner-container', { state: 'attached' });
+    const bannerInBounds = await page.evaluate(() => {
+      const app = document.getElementById('app').getBoundingClientRect();
+      const grid = document.getElementById('levelsGrid').getBoundingClientRect();
+      const slot = document.getElementById('bannerSlot').getBoundingClientRect();
+      return slot.width === 0 || (slot.right <= app.right + 1 && slot.top >= grid.bottom - 1);
+    });
+    assert.equal(bannerInBounds, true, `Banner slot must not overlap levelsGrid on ${vp.name}`);
+    await page.click('#lvlTile-1');
     await page.waitForSelector('#puzzleBoard');
+    assert.equal(await page.locator('#responsive-banner-container').count(), 0, 'No banner during gameplay');
 
     // Lifeline: verify 3 hearts are displayed and full, and HUD fits inside #app
     const hearts = await page.locator('.hud-lives .heart.is-full').count();

@@ -584,4 +584,63 @@ await test('CrazyGames Stage 3 rewarded ads enforce lifecycle, cooldown, single-
   }
 });
 
+await test('CrazyGames Stage 4 banners enforce 20s cooldown, clearAllBanners, and error handling', async () => {
+  const prevCG = globalThis.CrazyGames;
+  try {
+    let bannerCalls = 0;
+    let cleared = 0;
+    let nextErr = null;
+    globalThis.CrazyGames = {
+      SDK: {
+        environment: 'crazygames',
+        init: async () => {},
+        game: { settings: { muteAudio: false } },
+        banner: {
+          requestResponsiveBanner: async (id) => {
+            bannerCalls++;
+            assert.ok(id);
+            if (nextErr) throw { code: nextErr };
+          },
+          clearAllBanners: () => { cleared++; }
+        }
+      }
+    };
+
+    assert.equal(await Platform.initialize('crazygames'), true);
+    assert.equal(Platform.isBannerAvailable(), true);
+
+    // 1. First request succeeds; immediate repeat hits 20s cooldown
+    const b1 = await Platform.requestResponsiveBanner('responsive-banner-container');
+    assert.equal(b1.ok, true);
+    assert.equal(bannerCalls, 1);
+
+    const bCooldown = await Platform.requestResponsiveBanner('responsive-banner-container');
+    assert.equal(bCooldown.ok, false);
+    assert.equal(bCooldown.code, 'bannerCooldown');
+    assert.equal(bannerCalls, 1);
+
+    Platform.clearAllBanners();
+    assert.equal(cleared, 1);
+
+    // 2. Transient errors (unfilled, adblock/other, notVisible, etc.) do not crash
+    for (const code of ['unfilled', 'missingId', 'notVisible', 'noAvailableSizes', 'notCreated', 'videoAdPlaying', 'other']) {
+      nextErr = code;
+      const res = await Platform.requestResponsiveBanner('banner-' + code);
+      assert.equal(res.ok, false);
+      assert.equal(res.code, code);
+    }
+
+    // 3. bannersDisabled (Basic Launch) disables banners for the session
+    nextErr = 'bannersDisabled';
+    const bDis = await Platform.requestResponsiveBanner('banner-basic');
+    assert.equal(bDis.ok, false);
+    assert.equal(bDis.code, 'bannersDisabled');
+    assert.equal(Platform.isBannerAvailable(), false);
+  } finally {
+    if (prevCG === undefined) delete globalThis.CrazyGames;
+    else globalThis.CrazyGames = prevCG;
+    await Platform.initialize('dev');
+  }
+});
+
 console.log(`\n${passed} tests passed.`);
