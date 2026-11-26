@@ -57,7 +57,7 @@
     var arrow = pickValidHint(board);
     if (!arrow) return Promise.resolve({ ok: false, reason: 'none' });
 
-    if (Cubiqo.Platform.isAvailable()) {
+    if (Config.MONETIZATION.rewardedAdsEnabled && Cubiqo.Platform.isAvailable()) {
       Cubiqo.Analytics.track('hint_requested', { mode: 'rewarded' });
       return Cubiqo.Platform.showRewardedHint().then(function (rewarded) {
         if (rewarded !== true) return { ok: false, reason: 'ad-unavailable' };
@@ -66,7 +66,7 @@
       });
     }
 
-    if (Config.MONETIZATION.hintsFree && !Config.MONETIZATION.enabled) {
+    if (Config.MONETIZATION.hintsFree) {
       Cubiqo.Analytics.track('hint_requested', { mode: 'free' });
       return Promise.resolve({ ok: true, arrow: arrow });
     }

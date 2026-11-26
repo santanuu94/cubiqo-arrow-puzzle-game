@@ -49,11 +49,13 @@
     /* Fully online architecture: internet connection required to launch & play */
     ONLINE_REQUIRED: true,
 
-    /* Portal SDK & Monetization config (ads delivered exclusively via portal SDKs) */
+    /* Portal SDK & Monetization config (Stage 2: midgame ads via portal SDK; hints stay free) */
     MONETIZATION: {
-      enabled: false,
+      enabled: true,
       hintsFree: true,
-      adRequestsEnabled: false,
+      adRequestsEnabled: true,
+      midgameAdsEnabled: true,
+      rewardedAdsEnabled: false,
       portalDetection: true
     },
 

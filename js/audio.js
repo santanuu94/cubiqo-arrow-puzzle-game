@@ -15,6 +15,7 @@
   var musicActive = false;
   var chordIdx = 0;
   var platformMuted = false;
+  var adMuted = false;
 
   var CHORDS = [
     [261.63, 329.63, 392.00], /* Cmaj */
@@ -53,7 +54,7 @@
   }
 
   function tone(freq, dur, type, vol, delay) {
-    if (platformMuted || !Storage.getSettings().sound) return;
+    if (platformMuted || adMuted || !Storage.getSettings().sound) return;
     var c = getCtx();
     if (!c) return;
     unlock();
@@ -196,13 +197,19 @@
   }
 
   function syncMusic() {
-    if (!platformMuted && Storage.getSettings().music) startMusic();
+    if (!platformMuted && !adMuted && Storage.getSettings().music) startMusic();
     else stopMusic();
   }
 
   function setPlatformMute(muted) {
     platformMuted = !!muted;
     if (platformMuted) stopMusic();
+    else syncMusic();
+  }
+
+  function setAdMute(muted) {
+    adMuted = !!muted;
+    if (adMuted) stopMusic();
     else syncMusic();
   }
 
@@ -221,6 +228,8 @@
     syncMusic: syncMusic,
     stopMusic: stopMusic,
     setPlatformMute: setPlatformMute,
-    isPlatformMuted: function () { return platformMuted; }
+    setAdMute: setAdMute,
+    isPlatformMuted: function () { return platformMuted; },
+    isAdMuted: function () { return adMuted; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

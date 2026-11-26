@@ -32,6 +32,8 @@
     hintArrowId: null,
     animating: false,
     completedOnce: false,
+    adActive: false,
+    adPending: false,
     lastCompleteInfo: null,
     toastTimer: null,
     runToken: 0,
@@ -670,9 +672,21 @@
     }
 
     var nextBtn = document.getElementById('btnNextLevel');
+    var replayBtn = document.getElementById('btnReplay');
+    var homeBtn = document.getElementById('btnCompleteHome');
     if (nextBtn) nextBtn.addEventListener('click', function () {
+      if (state.adPending || state.adActive) return;
       Audio.playClick();
-      startMainLevel(state.levelId + 1);
+      state.adPending = true;
+      nextBtn.disabled = true;
+      if (replayBtn) replayBtn.disabled = true;
+      if (homeBtn) homeBtn.disabled = true;
+      var nextLevelId = state.levelId + 1;
+      Platform.showInterstitial().catch(function () { return false; }).then(function () {
+        state.adPending = false;
+        state.adActive = false;
+        startMainLevel(nextLevelId);
+      });
     });
     var vicBtn = document.getElementById('btnToVictory');
     if (vicBtn) vicBtn.addEventListener('click', function () {
@@ -1189,6 +1203,7 @@
     triggerHint: triggerHint,
     showOfflineGate: showOfflineGate,
     hideOfflineGate: hideOfflineGate,
+    setAdActive: function (active) { state.adActive = !!active; },
     getState: function () { return state; }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

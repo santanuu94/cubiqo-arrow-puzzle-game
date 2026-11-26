@@ -64,6 +64,7 @@
     /* Keyboard shortcuts (PRD §5 Screen 4) */
     document.addEventListener('keydown', function (e) {
       var st = Cubiqo.UI.getState();
+      if (st.adActive || st.adPending) return;
       if (e.key === 'Escape') {
         if (st.screen === 'gameplay') {
           if (st.gameOver || st.completedOnce) return;

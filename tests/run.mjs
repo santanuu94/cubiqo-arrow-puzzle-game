@@ -136,8 +136,9 @@ await test('daily challenge is deterministic and isolated from main campaign', (
   assert.equal(Storage.load().highestUnlocked, 1);
 });
 
-await test('platform adapter has monetization disabled in initial build', async () => {
-  assert.equal(Config.MONETIZATION.enabled, false);
+await test('platform adapter keeps hints free and DevAdapter unavailable in Stage 2', async () => {
+  assert.equal(Config.MONETIZATION.midgameAdsEnabled, true);
+  assert.equal(Config.MONETIZATION.rewardedAdsEnabled, false);
   assert.equal(Config.MONETIZATION.hintsFree, true);
   await Platform.initialize('dev');
   assert.equal(Platform.isAvailable(), false);
@@ -312,6 +313,7 @@ await test('online network check blocks offline state and restores on reconnect'
 await test('portal SDK failures are handled gracefully and never fake rewarded ads', async () => {
   const prevEnabled = Config.MONETIZATION.enabled;
   const prevAdReq = Config.MONETIZATION.adRequestsEnabled;
+  const prevRew = Config.MONETIZATION.rewardedAdsEnabled;
   const prevPoki = globalThis.PokiSDK;
 
   try {
@@ -322,9 +324,10 @@ await test('portal SDK failures are handled gracefully and never fake rewarded a
     assert.equal(Platform.getStatus().status, 'failed');
     assert.equal(Platform.isAvailable(), false);
 
-    // 2. Active portal SDK: ad declined/failed NEVER grants rewarded benefit
+    // 2. Active portal SDK with rewarded ads enabled: ad declined/failed NEVER grants rewarded benefit
     Config.MONETIZATION.enabled = true;
     Config.MONETIZATION.adRequestsEnabled = true;
+    Config.MONETIZATION.rewardedAdsEnabled = true;
     globalThis.PokiSDK = {
       init: () => Promise.resolve(),
       rewardedBreak: () => Promise.resolve(false)
@@ -345,6 +348,7 @@ await test('portal SDK failures are handled gracefully and never fake rewarded a
   } finally {
     Config.MONETIZATION.enabled = prevEnabled;
     Config.MONETIZATION.adRequestsEnabled = prevAdReq;
+    Config.MONETIZATION.rewardedAdsEnabled = prevRew;
     if (prevPoki === undefined) delete globalThis.PokiSDK;
     else globalThis.PokiSDK = prevPoki;
     await Platform.initialize('dev');
@@ -395,7 +399,7 @@ await test('CrazyGames SDK v3 handles init, environments, lifecycle, and muteAud
     assert.equal(await Platform.initialize('crazygames'), true);
     assert.equal(Platform.getEnvironment(), 'local');
     assert.equal(Cubiqo.Audio.isPlatformMuted(), true);
-    assert.equal(Platform.isAvailable(), false); // ads disabled in Stage 1
+    assert.equal(Platform.isAvailable(), true); // ready for midgame ads in Stage 2
 
     // Settings change listener updates muteAudio dynamically
     assert.ok(settingsCb);
@@ -418,6 +422,62 @@ await test('CrazyGames SDK v3 handles init, environments, lifecycle, and muteAud
     // Rapid pause/resume/stop within 1000ms is throttled rather than spamming CrazyGames SDK
     assert.equal(calls.length, 3);
   } finally {
+    Cubiqo.Audio.setPlatformMute(false);
+    if (prevCG === undefined) delete globalThis.CrazyGames;
+    else globalThis.CrazyGames = prevCG;
+    await Platform.initialize('dev');
+  }
+});
+
+await test('CrazyGames Stage 2 midgame ads handle adStarted/adFinished/adError, audio restore & deduplication', async () => {
+  const prevCG = globalThis.CrazyGames;
+  try {
+    let adRequests = 0;
+    let lastCallbacks = null;
+    globalThis.CrazyGames = {
+      SDK: {
+        environment: 'crazygames',
+        init: async () => {},
+        game: { settings: { muteAudio: false } },
+        ad: {
+          requestAd: (type, cb) => {
+            assert.equal(type, 'midgame');
+            adRequests++;
+            lastCallbacks = cb;
+          }
+        }
+      }
+    };
+
+    assert.equal(await Platform.initialize('crazygames'), true);
+
+    // 1. adStarted mutes audio (NOT before!), adFinished restores audio; duplicate calls coalesce
+    const p1 = Platform.showInterstitial();
+    const p2 = Platform.showInterstitial();
+    assert.equal(adRequests, 1); // no duplicate ad requests
+    assert.equal(Cubiqo.Audio.isAdMuted(), false); // never muted before adStarted
+    lastCallbacks.adStarted();
+    assert.equal(Cubiqo.Audio.isAdMuted(), true);
+    lastCallbacks.adFinished();
+    assert.equal(await p1, true);
+    assert.equal(await p2, true);
+    assert.equal(Cubiqo.Audio.isAdMuted(), false);
+
+    // 2. adError (unfilled / adblocker / Basic Launch) restores audio & resolves false without freezing
+    const p3 = Platform.showInterstitial();
+    assert.equal(adRequests, 2);
+    lastCallbacks.adStarted();
+    assert.equal(Cubiqo.Audio.isAdMuted(), true);
+    lastCallbacks.adError({ code: 'adblock' });
+    assert.equal(await p3, false);
+    assert.equal(Cubiqo.Audio.isAdMuted(), false);
+
+    // 3. Hints remain free in Stage 2 (no rewarded ads requested)
+    const hintRes = await Hints.requestHint(Puzzle.createBoard(Levels.byId(1)));
+    assert.equal(hintRes.ok, true);
+    assert.equal(adRequests, 2);
+  } finally {
+    Cubiqo.Audio.setAdMute(false);
     Cubiqo.Audio.setPlatformMute(false);
     if (prevCG === undefined) delete globalThis.CrazyGames;
     else globalThis.CrazyGames = prevCG;

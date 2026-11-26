@@ -73,6 +73,7 @@
     this.gameplayActive = false;
     this._lastGameplayCallAt = 0;
     this._gameplayTimer = null;
+    this._adPending = null;
     this._settingsListener = null;
   }
   CrazyGamesAdapter.prototype = {
@@ -121,7 +122,9 @@
     },
     showRewardedHint: function () {
       var sdk = this.sdk;
-      if (!this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) return Promise.resolve(false);
+      if (!MONETIZATION.rewardedAdsEnabled || !this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) {
+        return Promise.resolve(false);
+      }
       this.gameplayStop();
       return new Promise(function (resolve) {
         try {
@@ -133,17 +136,44 @@
       });
     },
     showInterstitial: function () {
+      var self = this;
       var sdk = this.sdk;
-      if (!this.isAvailable() || !sdk.ad || !sdk.ad.requestAd) return Promise.resolve(false);
-      this.gameplayStop();
-      return new Promise(function (resolve) {
+      if (!MONETIZATION.midgameAdsEnabled || !this.isAvailable() || !sdk.ad || typeof sdk.ad.requestAd !== 'function') {
+        return Promise.resolve(false);
+      }
+      if (this._adPending) return this._adPending;
+
+      this._adPending = new Promise(function (resolve) {
+        var settled = false;
+        function done(ok) {
+          if (settled) return;
+          settled = true;
+          self._adPending = null;
+          if (Cubiqo.Audio && Cubiqo.Audio.setAdMute) Cubiqo.Audio.setAdMute(false);
+          if (Cubiqo.UI && Cubiqo.UI.setAdActive) Cubiqo.UI.setAdActive(false);
+          resolve(ok);
+        }
+
         try {
           sdk.ad.requestAd('midgame', {
-            adFinished: function () { resolve(true); },
-            adError: function () { resolve(false); }
+            adStarted: function () {
+              self.gameplayStop();
+              if (Cubiqo.Audio && Cubiqo.Audio.setAdMute) Cubiqo.Audio.setAdMute(true);
+              if (Cubiqo.UI && Cubiqo.UI.setAdActive) Cubiqo.UI.setAdActive(true);
+            },
+            adFinished: function () {
+              done(true);
+            },
+            adError: function () {
+              done(false);
+            }
           });
-        } catch (e) { resolve(false); }
+        } catch (e) {
+          done(false);
+        }
       });
+
+      return this._adPending;
     },
     pauseGame: function () { this.gameplayStop(); },
     resumeGame: function () { this.gameplayStart(); },
